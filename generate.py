@@ -116,15 +116,22 @@ def fetch_records():
     recs.sort(key=lambda r: r["date"], reverse=True)
     return recs
 
+def fetch_rep_options():
+    """Current valid selections in the 'From whom...' dropdown. Reps no longer in this
+    list (e.g. departed reps) are dropped from the competition board entirely."""
+    q = api(f"form/{FORM}/question/{QID['rep']}")["content"]
+    return set(o.strip() for o in (q.get("options") or "").split("|") if o.strip())
+
 # ---- aggregation helpers ----
 def qkey(r): return f"{r['year']}-Q{r['q']}"
 def qlabel(y, q): return f"Q{q} {y}"
 def quarter_end(y, q): return datetime.date(y, *{1:(3,31),2:(6,30),3:(9,30),4:(12,31)}[q])
 
-def build_competition(records, today):
+def build_competition(records, today, current_reps):
     buckets = {}
     for r in records:
-        if r["rep"] in EXCLUDE: continue
+        # Only count reps who are excluded-free AND still a valid current dropdown option.
+        if r["rep"] in EXCLUDE or r["rep"] not in current_reps: continue
         buckets.setdefault((r["year"], r["q"]), {}).setdefault(r["rep"], set()).add(r["dkey"])
     def rows(key):
         reps = buckets.get(key, {})
@@ -236,7 +243,8 @@ def build_consumption(records, today):
 
 def build(records):
     today = datetime.datetime.now().date()
-    current, past = build_competition(records, today)
+    current_reps = fetch_rep_options()
+    current, past = build_competition(records, today, current_reps)
     team = {"clinics": len(set(r["dkey"] for r in records)),
             "bottles": sum(r["samples"] for r in records)}
     latest = records[0]["date"] if records else "-"
@@ -282,6 +290,7 @@ header svg{width:34px;height:34px;flex:none}
 .lrow.top{background:#f3fbfa}.lrow .rank{font-weight:800;text-align:center}.lrow .who{font-weight:600}
 .lrow .barwrap{background:#eef3f2;border-radius:6px;height:18px;overflow:hidden}.lrow .bar{height:100%;background:var(--teal)}
 .lrow .pts{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}.lrow .prize{font-size:11px;color:#9a6b00;font-weight:700}
+.lrow .prize.tie{color:#c0392b;font-size:10px;text-transform:uppercase;letter-spacing:.3px}
 .lrow .gap{font-size:10.5px;color:var(--muted)}.medal{font-size:16px}
 .qpast{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
 .qbox{border:1px solid var(--line);border-radius:11px;padding:12px 14px}.qbox h3{margin:0 0 8px;font-size:13px}
@@ -317,14 +326,20 @@ function leaderboard(host,q){
   const rows=q.rows||[],max=Math.max(1,...rows.map(r=>r.points));
   if(!rows.length){host.innerHTML='<p class="note">No qualifying signatures yet this quarter — wide open.</p>';return;}
   host.innerHTML="";const lb=document.createElement("div");lb.className="lb";
+  const cnt={};rows.forEach(r=>cnt[r.points]=(cnt[r.points]||0)+1);
   rows.forEach((r,i)=>{
-    const prize=q.prizes&&q.prizes[i]?`$${fmt(q.prizes[i])}`:"";
+    let prizeHtml="";
+    if(q.prizes&&q.prizes[i]!=null){
+      prizeHtml = cnt[r.points]>1
+        ? '<div class="prize tie">tiebreaker needed!</div>'
+        : '<div class="prize">$'+fmt(q.prizes[i])+'</div>';
+    }
     const gap=i===0?"leader":(rows[i-1].points-r.points===0?"tied":`-${rows[i-1].points-r.points} to ${MEDAL[i-1]||"#"+i}`);
     const d=document.createElement("div");d.className="lrow"+(i<3?" top":"");
     d.innerHTML=`<div class="rank">${i<3?'<span class="medal">'+MEDAL[i]+'</span>':(i+1)}</div>
       <div><div class="who">${esc(r.rep)}</div><div class="gap">${gap}</div></div>
       <div class="barwrap"><div class="bar" style="width:${Math.max(4,r.points/max*100)}%"></div></div>
-      <div class="pts">${r.points}${prize?'<div class="prize">'+prize+'</div>':''}</div>`;
+      <div class="pts">${r.points}${prizeHtml}</div>`;
     lb.appendChild(d);
   });
   host.appendChild(lb);
