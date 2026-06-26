@@ -1,142 +1,185 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
-<title>Zimed Sampling Competition</title>
-<style>
-:root{--bg:#f4f6f8;--card:#fff;--ink:#1f2d3d;--muted:#6b7a8d;--line:#e3e8ee;--primary:#0e7c86;--accent:#f2785c;--grey:#b8c2cc;--grey-soft:#d7dde3;}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-header{background:linear-gradient(120deg,#0e7c86,#0a5f67);color:#fff;padding:24px 32px 20px}
-header h1{margin:0;font-size:21px}header .sub{margin-top:5px;font-size:13px;opacity:.9}
+<title>Zimed Sampling Competition</title><style>
+:root{--teal:#03BAB3;--teal-d:#06827b;--gold:#FAB718;--ink:#233534;--muted:#6a807e;
+--bg:#eef5f4;--card:#fff;--line:#dfeae8;--grey:#b8c8c6;}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
+font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+header{background:linear-gradient(120deg,var(--teal-d),var(--teal));color:#fff;padding:22px 30px;
+display:flex;align-items:center;gap:20px;border-bottom:4px solid var(--gold)}
+header h1{margin:0;font-size:22px;font-weight:800}header .sub{margin-top:4px;font-size:13px;opacity:.95}
+header img.prod{height:96px;margin-left:auto;background:#fff;padding:4px;border-radius:6px;filter:drop-shadow(0 6px 14px rgba(0,0,0,.25))}
+header svg{width:34px;height:34px;flex:none}
 .wrap{max-width:1180px;margin:0 auto;padding:20px 22px 60px}
-.banner{border-radius:8px;padding:9px 14px;font-size:12.5px;margin:16px 0 4px}
-.banner.pub{background:#eef6f7;border:1px solid #bfe0e3;color:#0a5f67}
+.sec{margin:26px 0 6px;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--teal-d);border-bottom:2px solid var(--line);padding-bottom:6px}
+.banner{border-radius:9px;padding:10px 14px;font-size:12.5px;margin:16px 0 6px}
+.banner.pub{background:#e2f5f3;border:1px solid #b6e6e1;color:#0a6b65}
 .banner.priv{background:#fff4f1;border:1px solid #f7b3a3;color:#9c3b25}
-.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:13px;margin:16px 0 12px}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 15px}
-.kpi .n{font-size:23px;font-weight:700;line-height:1}.kpi .l{font-size:12px;color:var(--muted);margin-top:6px}.kpi .s{font-size:11px;color:var(--muted);margin-top:3px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px 14px;margin-top:16px}
-.card h2{margin:0 0 2px;font-size:15px}.card .note{font-size:11.5px;color:var(--muted);margin:0 0 8px}
-.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}.cols .card{margin-top:0}
-svg{width:100%;height:auto;display:block;overflow:visible}
-.gridline{stroke:#eef2f6}.axis{stroke:var(--line)}.tick{fill:var(--muted);font-size:11px}
-.blab{fill:var(--ink);font-size:11px}.vlab{fill:var(--ink);font-size:11px;font-weight:600}.bar:hover{opacity:.82}
-.toolbar{display:flex;gap:10px;align-items:center;margin:6px 0 12px;flex-wrap:wrap}
-.toolbar input{flex:1;min-width:220px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px}
-.toolbar select{padding:8px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff}
-.toolbar .count{font-size:12px;color:var(--muted)}
-table{width:100%;border-collapse:collapse;font-size:12.5px}th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-th{position:sticky;top:0;background:#f0f4f6;cursor:pointer;font-size:11.5px;text-transform:uppercase;letter-spacing:.3px;color:#46586b;white-space:nowrap}
-td.num{text-align:right;font-variant-numeric:tabular-nums}.tablewrapin{max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:10px}
-tr.nonrep td{background:#fbfbf3}.pill{display:inline-block;padding:1px 8px;border-radius:20px;font-size:11px;font-weight:600;background:#dff0f1;color:#0a5f67}.pill.g{background:var(--grey-soft);color:#4b5a68}
-.foot{font-size:11.5px;color:var(--muted);margin-top:24px;line-height:1.5}
-@media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}.cols{grid-template-columns:1fr}}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:14px 0}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px 15px;position:relative;overflow:hidden}
+.kpi:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--teal)}
+.kpi .n{font-size:22px;font-weight:800;line-height:1.05}.kpi .l{font-size:12px;color:var(--muted);margin-top:6px}.kpi .s{font-size:11px;color:var(--muted);margin-top:3px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:16px 18px 14px;margin-top:14px}
+.card h2{margin:0 0 3px;font-size:15px}.card .note{font-size:11.5px;color:var(--muted);margin:0 0 12px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}.cols .card{margin-top:0}
+.pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;background:#e2f5f3;color:#0a6b65}
+.countdown{font-size:12px;font-weight:700;color:var(--teal-d);background:#e2f5f3;padding:4px 11px;border-radius:20px;margin-left:8px}
+.lb{display:flex;flex-direction:column;gap:7px}
+.lrow{display:grid;grid-template-columns:40px 1fr 150px 70px;align-items:center;gap:12px;padding:7px 8px;border-radius:9px}
+.lrow.top{background:#f3fbfa}.lrow .rank{font-weight:800;text-align:center}.lrow .who{font-weight:600}
+.lrow .barwrap{background:#eef3f2;border-radius:6px;height:18px;overflow:hidden}.lrow .bar{height:100%;background:var(--teal)}
+.lrow .pts{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}.lrow .prize{font-size:11px;color:#9a6b00;font-weight:700}
+.lrow .gap{font-size:10.5px;color:var(--muted)}.medal{font-size:16px}
+.qpast{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.qbox{border:1px solid var(--line);border-radius:11px;padding:12px 14px}.qbox h3{margin:0 0 8px;font-size:13px}
+.qbox .r{display:flex;justify-content:space-between;font-size:12.5px;padding:2px 0}.qbox .r.win{font-weight:800;color:var(--teal-d)}
+.card svg{width:100%;height:auto;display:block;overflow:visible}
+.gridline{stroke:#eef3f2}.tick{fill:var(--muted);font-size:10.5px}.vlab{fill:var(--ink);font-size:10.5px;font-weight:700}
+.hbars{display:flex;flex-direction:column;gap:6px}
+.hbar{display:grid;grid-template-columns:120px 1fr 64px;align-items:center;gap:10px;font-size:12px}
+.hbar .t{background:#eef3f2;border-radius:5px;height:16px;overflow:hidden}.hbar .f{height:100%;background:var(--teal)}
+.hbar .v{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-size:12.5px}th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:#eef5f4;font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:#46625f;white-space:nowrap;cursor:pointer}
+td.num{text-align:right;font-variant-numeric:tabular-nums}.tin{max-height:520px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.toolbar{display:flex;gap:10px;align-items:center;margin:4px 0 12px;flex-wrap:wrap}
+.toolbar input{flex:1;min-width:200px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px}
+.toolbar select{padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.foot{font-size:11.5px;color:var(--muted);margin-top:24px;line-height:1.55}.luvo{font-weight:800;letter-spacing:1px;color:var(--teal-d)}
+@media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}.cols{grid-template-columns:1fr}header img.prod{display:none}}
 </style></head><body>
-<header><h1>Zimed Sampling Competition</h1>
-<div class="sub">Live from JotForm · sample requests by referrer, one chart per quarter</div></header>
+<header><svg width="34" height="34" viewBox="0 0 24 24"><path d="M12 2C12 2 4 11 4 16a8 8 0 0016 0c0-5-8-14-8-14z" fill="#fff"/><circle cx="12" cy="15.5" r="3.4" fill="#03BAB3"/></svg><div><h1>Zimed Sampling Competition</h1>
+<div class="sub">Live from JotForm · score = unique doctors signed per rep · Zimed PF by LUVO / Clarion</div></div><img class="prod" src="zimed-box.png" alt="Zimed PF"></header>
 <div class="wrap">
-<div class="banner pub">Public view. Aggregate competition standings only, no patient or physician details.</div>
+<div class="banner pub">Public standings. Aggregate competition results only — no patient or physician details. Score = unique doctors signed per rep.</div>
 <div class="kpis" id="kpis"></div>
-<div class="card"><h2>Submissions by month (2026)</h2><p class="note">Sample request forms submitted each month this year.</p><div id="monthChart"></div></div>
-<div id="quarters"></div>
+<div class="card"><h2><span id="cqlabel"></span><span class="countdown" id="cqdays"></span></h2>
+<p class="note">Live competition. Top three win $1,000 / $500 / $250. Score = unique doctors signed.</p>
+<div id="leaderboard"></div></div>
+<div class="card"><h2>Past quarters</h2><p class="note">Final standings by quarter. 🏆 = winner.</p><div id="past"></div></div>
 
-<div class="foot">Source: live JotForm “Zimed PF Sample Request Form”. Counts are raw (every submission as entered, including non-rep answers and internal rep-stock orders). Auto-refreshed from JotForm about every 20 minutes · <span id="stamp"></span>.</div>
-</div>
-<script>const AGG={"quarters": [{"label": "Q2 2026", "year": "2026", "q": 2, "bars": [{"rep": "Krish Khurana", "count": 42}, {"rep": "Aymeric Paillet", "count": 38}, {"rep": "Unsure", "count": 3}, {"rep": "Craig Fitch", "count": 2}, {"rep": "Another doctor", "count": 1}, {"rep": "Jessica Linder", "count": 1}, {"rep": "Martin Coutu", "count": 1}], "total": 88, "samples": 2260}, {"label": "Q1 2026", "year": "2026", "q": 1, "bars": [{"rep": "Krish Khurana", "count": 21}, {"rep": "Rawn Stokoe", "count": 5}, {"rep": "Craig Fitch", "count": 3}, {"rep": "Jessica Linder", "count": 2}, {"rep": "Another doctor", "count": 1}, {"rep": "Martin Coutu", "count": 1}], "total": 33, "samples": 780}, {"label": "Q4 2025", "year": "2025", "q": 4, "bars": [{"rep": "Rawn Stokoe", "count": 20}, {"rep": "Jessica Linder", "count": 17}, {"rep": "Martin Coutu", "count": 17}, {"rep": "Craig Fitch", "count": 16}, {"rep": "Krish Khurana", "count": 14}, {"rep": "Antoine Escher", "count": 3}, {"rep": "Another doctor", "count": 2}, {"rep": "Tyler Davis", "count": 1}, {"rep": "Unsure", "count": 1}], "total": 91, "samples": 1970}, {"label": "Q3 2025", "year": "2025", "q": 3, "bars": [{"rep": "Krish Khurana", "count": 47}, {"rep": "Craig Fitch", "count": 25}, {"rep": "Martin Coutu", "count": 18}, {"rep": "Rawn Stokoe", "count": 13}, {"rep": "Unsure", "count": 6}, {"rep": "Max Waibler", "count": 5}, {"rep": "(blank)", "count": 4}, {"rep": "Kevin Davis", "count": 1}, {"rep": "Antoine Escher", "count": 1}], "total": 120, "samples": 4920}, {"label": "Q2 2025", "year": "2025", "q": 2, "bars": [{"rep": "(blank)", "count": 24}], "total": 24, "samples": 1160}], "months": [{"label": "Jan", "key": "2026-01", "count": 15}, {"label": "Feb", "key": "2026-02", "count": 15}, {"label": "Mar", "key": "2026-03", "count": 3}, {"label": "Apr", "key": "2026-04", "count": 15}, {"label": "May", "key": "2026-05", "count": 36}, {"label": "Jun", "key": "2026-06", "count": 37}], "kpis": {"year": "2026", "submissions": 121, "samples": 3040, "referrers": 8, "top_rep": "Krish Khurana", "top_rep_n": 63, "latest": "2026-06-26", "all_time": 356}};
-const GENERATED_AT="data through 2026-06-26 (356 submissions all-time)";
+<div class="foot">Source: live JotForm “Zimed PF Sample Request Form”. Competition score = unique doctors who signed and named each rep (a doctor signing again does not add a point); Krish, Aymeric and non-rep answers are excluded from standings. Zimed PF (bimatoprost 0.03%) is a <span class="luvo">LUVO</span> brand distributed by Clarion Medical. Auto-refreshed about every 20 minutes · <span id="stamp"></span>.</div></div>
+<script>const DATA={"current": {"label": "Q2 2026", "days_left": 4, "prizes": [1000, 500, 250], "rows": [{"rep": "Craig Fitch", "points": 1}, {"rep": "Jessica Linder", "points": 1}, {"rep": "Martin Coutu", "points": 1}]}, "past": [{"label": "Q1 2026", "rows": [{"rep": "Rawn Stokoe", "points": 5}, {"rep": "Craig Fitch", "points": 3}, {"rep": "Jessica Linder", "points": 2}, {"rep": "Martin Coutu", "points": 1}], "winner": "Rawn Stokoe"}, {"label": "Q4 2025", "rows": [{"rep": "Rawn Stokoe", "points": 19}, {"rep": "Jessica Linder", "points": 17}, {"rep": "Martin Coutu", "points": 15}, {"rep": "Craig Fitch", "points": 15}, {"rep": "Antoine Escher", "points": 3}, {"rep": "Tyler Davis", "points": 1}], "winner": "Rawn Stokoe"}, {"label": "Q3 2025", "rows": [{"rep": "Craig Fitch", "points": 24}, {"rep": "Martin Coutu", "points": 18}, {"rep": "Rawn Stokoe", "points": 11}, {"rep": "Max Waibler", "points": 5}, {"rep": "Kevin Davis", "points": 1}, {"rep": "Antoine Escher", "points": 1}], "winner": "Craig Fitch"}], "team": {"clinics": 295, "bottles": 11090}, "consumption": {"kpis": {"bottles": 11090, "drops": 1109000, "requests": 356, "unique_docs": 295, "avg_per_req": 31.2, "reorder_pct": 16, "avg_req_per_q": 71.2, "avg_bottles_per_q": 2218, "median_gap": 77}, "by_month": [{"label": "Jun 25", "bottles": 1160, "requests": 24, "avg": 48.3}, {"label": "Jul 25", "bottles": 400, "requests": 9, "avg": 44.4}, {"label": "Aug 25", "bottles": 460, "requests": 10, "avg": 46.0}, {"label": "Sep 25", "bottles": 4060, "requests": 101, "avg": 40.2}, {"label": "Oct 25", "bottles": 640, "requests": 25, "avg": 25.6}, {"label": "Nov 25", "bottles": 560, "requests": 27, "avg": 20.7}, {"label": "Dec 25", "bottles": 770, "requests": 39, "avg": 19.7}, {"label": "Jan 26", "bottles": 360, "requests": 15, "avg": 24.0}, {"label": "Feb 26", "bottles": 370, "requests": 15, "avg": 24.7}, {"label": "Mar 26", "bottles": 50, "requests": 3, "avg": 16.7}, {"label": "Apr 26", "bottles": 370, "requests": 15, "avg": 24.7}, {"label": "May 26", "bottles": 840, "requests": 36, "avg": 23.3}, {"label": "Jun 26", "bottles": 1050, "requests": 37, "avg": 28.4}], "cumulative": [{"label": "Jun 25", "total": 1160}, {"label": "Jul 25", "total": 1560}, {"label": "Aug 25", "total": 2020}, {"label": "Sep 25", "total": 6080}, {"label": "Oct 25", "total": 6720}, {"label": "Nov 25", "total": 7280}, {"label": "Dec 25", "total": 8050}, {"label": "Jan 26", "total": 8410}, {"label": "Feb 26", "total": 8780}, {"label": "Mar 26", "total": 8830}, {"label": "Apr 26", "total": 9200}, {"label": "May 26", "total": 10040}, {"label": "Jun 26", "total": 11090}], "by_province": [{"k": "BC", "bottles": 5080}, {"k": "ON", "bottles": 2530}, {"k": "AB", "bottles": 1040}, {"k": "QC", "bottles": 820}, {"k": "—", "bottles": 570}, {"k": "NB", "bottles": 460}, {"k": "SK", "bottles": 320}, {"k": "MB", "bottles": 190}, {"k": "NL", "bottles": 40}, {"k": "YT", "bottles": 40}], "by_rep": [{"k": "Krish Khurana", "bottles": 4010}, {"k": "(blank)", "bottles": 1280}, {"k": "Craig Fitch", "bottles": 1250}, {"k": "Rawn Stokoe", "bottles": 1200}, {"k": "Martin Coutu", "bottles": 920}, {"k": "Aymeric Paillet", "bottles": 840}, {"k": "Unsure", "bottles": 500}, {"k": "Jessica Linder", "bottles": 480}, {"k": "Max Waibler", "bottles": 280}, {"k": "Antoine Escher", "bottles": 130}, {"k": "Another doctor", "bottles": 110}, {"k": "Kevin Davis", "bottles": 60}, {"k": "Tyler Davis", "bottles": 30}], "by_quarter": [{"label": "Q2 2025", "bottles": 1160, "requests": 24, "growth": null}, {"label": "Q3 2025", "bottles": 4920, "requests": 120, "growth": 324}, {"label": "Q4 2025", "bottles": 1970, "requests": 91, "growth": -60}, {"label": "Q1 2026", "bottles": 780, "requests": 33, "growth": -60}, {"label": "Q2 2026", "bottles": 2260, "requests": 88, "growth": 190}], "adoption": [{"k": "1×", "n": 247}, {"k": "2×", "n": 38}, {"k": "3×", "n": 7}, {"k": "4×", "n": 3}, {"k": ">4×", "n": 0}], "order_mix": [{"k": "10", "n": 44}, {"k": "20", "n": 132}, {"k": "30", "n": 69}, {"k": "40", "n": 75}, {"k": "60", "n": 14}, {"k": "80", "n": 5}, {"k": "100", "n": 17}], "reach": [{"label": "Q2 2025", "new": 24}, {"label": "Q3 2025", "new": 106}, {"label": "Q4 2025", "new": 83}, {"label": "Q1 2026", "new": 24}, {"label": "Q2 2026", "new": 58}], "newrep": [{"label": "Q2 2025", "new": 1160, "repeat": 0}, {"label": "Q3 2025", "new": 4540, "repeat": 380}, {"label": "Q4 2025", "new": 1870, "repeat": 100}, {"label": "Q1 2026", "new": 610, "repeat": 170}, {"label": "Q2 2026", "new": 1560, "repeat": 700}], "run": {"label": "Q2 2026", "so_far": 2260, "projected": 2364, "elapsed": 87, "total": 91}}, "stamp": "data through 2026-06-26 (356 submissions all-time)"};
+const IS_PUBLIC=true;
 
-const SVGNS="http://www.w3.org/2000/svg";
-function el(t,a,x){const e=document.createElementNS(SVGNS,t);for(const k in a)e.setAttribute(k,a[k]);if(x!=null)e.textContent=x;return e;}
-function svg(w,h){return el("svg",{viewBox:`0 0 ${w} ${h}`,width:w,height:h});}
-const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-const NONREP=new Set(["Unsure","Another doctor","(blank)"]);
+const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const NS="http://www.w3.org/2000/svg";
+function el(t,a,x){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(x!=null)e.textContent=x;return e;}
+const MEDAL=["🥇","🥈","🥉"];
+const fmt=n=>(+n).toLocaleString();
 
-function kpiCards(k){
-  const cards=[
-    [k.submissions, `Submissions (${k.year})`, "year to date"],
-    [k.samples.toLocaleString(), "Samples requested", `${k.year} year to date`],
-    [k.referrers, "Referrers", "distinct names on forms"],
-    [k.top_rep_n, "Top referrer", esc(k.top_rep)],
-    [k.latest, "Latest submission", `${k.all_time} all-time`],
-  ];
-  document.getElementById("kpis").innerHTML=cards.map(c=>
-    `<div class="kpi"><div class="n">${esc(c[0])}</div><div class="l">${esc(c[1])}</div><div class="s">${esc(c[2])}</div></div>`).join("");
-}
-
-function repBarChart(host, bars){
-  const W=860,rowH=32,padL=160,padR=64,padT=8,H=padT+bars.length*rowH+8;
-  const max=Math.max(1,...bars.map(b=>b.count));
-  const s=svg(W,H),x0=padL,xW=W-padL-padR;
-  bars.forEach((b,i)=>{
-    const y=padT+i*rowH+5,bw=Math.max(2,(b.count/max)*xW),non=NONREP.has(b.rep);
-    s.appendChild(el("text",{x:x0-10,y:y+13,"text-anchor":"end",class:"blab"},b.rep));
-    const rc=el("rect",{x:x0,y:y,width:bw,height:rowH-13,rx:4,fill:non?"var(--grey)":"var(--primary)",class:"bar"});
-    rc.appendChild(el("title",null,`${b.rep}: ${b.count}`));s.appendChild(rc);
-    s.appendChild(el("text",{x:x0+bw+8,y:y+13,class:"vlab"},b.count));
+function leaderboard(host,q){
+  const rows=q.rows||[],max=Math.max(1,...rows.map(r=>r.points));
+  if(!rows.length){host.innerHTML='<p class="note">No qualifying signatures yet this quarter — wide open.</p>';return;}
+  host.innerHTML="";const lb=document.createElement("div");lb.className="lb";
+  rows.forEach((r,i)=>{
+    const prize=q.prizes&&q.prizes[i]?`$${fmt(q.prizes[i])}`:"";
+    const gap=i===0?"leader":(rows[i-1].points-r.points===0?"tied":`-${rows[i-1].points-r.points} to ${MEDAL[i-1]||"#"+i}`);
+    const d=document.createElement("div");d.className="lrow"+(i<3?" top":"");
+    d.innerHTML=`<div class="rank">${i<3?'<span class="medal">'+MEDAL[i]+'</span>':(i+1)}</div>
+      <div><div class="who">${esc(r.rep)}</div><div class="gap">${gap}</div></div>
+      <div class="barwrap"><div class="bar" style="width:${Math.max(4,r.points/max*100)}%"></div></div>
+      <div class="pts">${r.points}${prize?'<div class="prize">'+prize+'</div>':''}</div>`;
+    lb.appendChild(d);
   });
-  host.appendChild(s);
+  host.appendChild(lb);
 }
-
-function monthChart(host, months){
-  if(!months.length) return;
-  const W=520,H=240,padL=34,padR=16,padT=16,padB=30;
-  const vals=months.map(m=>m.count),max=Math.max(5,...vals),plotW=W-padL-padR,plotH=H-padT-padB;
-  const s=svg(W,H);
-  for(let g=0;g<=4;g++){const yv=Math.round(max*g/4),y=padT+plotH-(yv/max)*plotH;
-    s.appendChild(el("line",{x1:padL,y1:y,x2:W-padR,y2:y,class:"gridline"}));
-    s.appendChild(el("text",{x:padL-8,y:y+4,"text-anchor":"end",class:"tick"},yv));}
-  const st=plotW/Math.max(1,months.length-1);
-  const pts=vals.map((v,i)=>[padL+i*st,padT+plotH-(v/max)*plotH]);
+function pastQ(host,past){
+  host.innerHTML="";if(!past.length)return;const g=document.createElement("div");g.className="qpast";
+  past.forEach(q=>{const b=document.createElement("div");b.className="qbox";let h=`<h3>${esc(q.label)}</h3>`;
+    (q.rows||[]).slice(0,5).forEach((r,i)=>h+=`<div class="r${i===0?' win':''}"><span>${i===0?'🏆 ':''}${esc(r.rep)}</span><span>${r.points}</span></div>`);
+    b.innerHTML=h;g.appendChild(b);});host.appendChild(g);
+}
+function hbars(id,items,key){key=key||"bottles";const host=document.getElementById(id);if(!host)return;
+  const max=Math.max(1,...items.map(i=>i[key]));host.innerHTML="";const w=document.createElement("div");w.className="hbars";
+  items.forEach(it=>{const row=document.createElement("div");row.className="hbar";
+    row.innerHTML=`<div title="${esc(it.k)}">${esc(it.k)}</div><div class="t"><div class="f" style="width:${Math.max(3,it[key]/max*100)}%"></div></div><div class="v">${fmt(it[key])}</div>`;
+    w.appendChild(row);});host.appendChild(w);}
+function line(id,items,key,color){const host=document.getElementById(id);if(!host)return;color=color||"#03BAB3";
+  const W=520,H=210,pL=42,pR=16,pT=14,pB=28,vals=items.map(m=>m[key]),max=Math.max(1,...vals),pw=W-pL-pR,ph=H-pT-pB;
+  const s=el("svg",{viewBox:`0 0 ${W} ${H}`});
+  for(let g=0;g<=4;g++){const yv=Math.round(max*g/4),y=pT+ph-(yv/max)*ph;s.appendChild(el("line",{x1:pL,y1:y,x2:W-pR,y2:y,class:"gridline"}));s.appendChild(el("text",{x:pL-7,y:y+4,"text-anchor":"end",class:"tick"},yv));}
+  const st=pw/Math.max(1,items.length-1),pts=vals.map((v,i)=>[pL+i*st,pT+ph-(v/max)*ph]);
   let dp="";pts.forEach((p,i)=>dp+=(i?"L":"M")+p[0]+" "+p[1]+" ");
-  if(pts.length>1){s.appendChild(el("path",{d:dp+`L ${pts[pts.length-1][0]} ${padT+plotH} L ${pts[0][0]} ${padT+plotH} Z`,fill:"rgba(14,124,134,.10)"}));
-    s.appendChild(el("path",{d:dp,fill:"none",stroke:"var(--primary)","stroke-width":2.5}));}
-  pts.forEach((p,i)=>{const c=el("circle",{cx:p[0],cy:p[1],r:4,fill:"#fff",stroke:"var(--primary)","stroke-width":2.5});
-    c.appendChild(el("title",null,`${months[i].label}: ${vals[i]}`));s.appendChild(c);
-    s.appendChild(el("text",{x:p[0],y:p[1]-9,"text-anchor":"middle",class:"vlab"},vals[i]));
-    s.appendChild(el("text",{x:p[0],y:H-10,"text-anchor":"middle",class:"tick"},months[i].label));});
-  host.appendChild(s);
-}
+  if(pts.length>1){s.appendChild(el("path",{d:dp+`L ${pts.at(-1)[0]} ${pT+ph} L ${pts[0][0]} ${pT+ph} Z`,fill:color+"22"}));s.appendChild(el("path",{d:dp,fill:"none",stroke:color,"stroke-width":2.5}));}
+  pts.forEach((p,i)=>{const c=el("circle",{cx:p[0],cy:p[1],r:3.5,fill:"#fff",stroke:color,"stroke-width":2.5});c.appendChild(el("title",null,`${items[i].label}: ${vals[i]}`));s.appendChild(c);
+    if(items.length<=8)s.appendChild(el("text",{x:p[0],y:p[1]-8,"text-anchor":"middle",class:"vlab"},vals[i]));
+    s.appendChild(el("text",{x:p[0],y:H-9,"text-anchor":"middle",class:"tick"},items[i].label));});
+  host.appendChild(s);}
+function vbars(id,items,key,labelKey,extra){const host=document.getElementById(id);if(!host)return;labelKey=labelKey||"k";
+  const W=520,H=220,pL=36,pR=12,pT=18,pB=34,vals=items.map(i=>i[key]),max=Math.max(1,...vals),pw=W-pL-pR,ph=H-pT-pB;
+  const s=el("svg",{viewBox:`0 0 ${W} ${H}`});
+  for(let g=0;g<=4;g++){const yv=Math.round(max*g/4),y=pT+ph-(yv/max)*ph;s.appendChild(el("line",{x1:pL,y1:y,x2:W-pR,y2:y,class:"gridline"}));s.appendChild(el("text",{x:pL-7,y:y+4,"text-anchor":"end",class:"tick"},yv));}
+  const bw=pw/items.length*0.6,step=pw/items.length;
+  items.forEach((it,i)=>{const x=pL+i*step+step/2,h=(it[key]/max)*ph,y=pT+ph-h;
+    const rc=el("rect",{x:x-bw/2,y:y,width:bw,height:h,rx:3,fill:"#03BAB3"});rc.appendChild(el("title",null,`${it[labelKey]}: ${it[key]}`));s.appendChild(rc);
+    s.appendChild(el("text",{x:x,y:y-5,"text-anchor":"middle",class:"vlab"},it[key]));
+    s.appendChild(el("text",{x:x,y:H-18,"text-anchor":"middle",class:"tick"},it[labelKey]));
+    if(extra&&it[extra]!=null)s.appendChild(el("text",{x:x,y:H-6,"text-anchor":"middle",class:"tick",fill:(it[extra]>=0?"#06827b":"#c0392b")},(it[extra]>0?"+":"")+it[extra]+"%"));});
+  host.appendChild(s);}
+function stacked(id,items){const host=document.getElementById(id);if(!host)return;
+  const W=520,H=220,pL=36,pR=12,pT=18,pB=30,tot=items.map(i=>i.new+i.repeat),max=Math.max(1,...tot),pw=W-pL-pR,ph=H-pT-pB;
+  const s=el("svg",{viewBox:`0 0 ${W} ${H}`});
+  for(let g=0;g<=4;g++){const yv=Math.round(max*g/4),y=pT+ph-(yv/max)*ph;s.appendChild(el("line",{x1:pL,y1:y,x2:W-pR,y2:y,class:"gridline"}));s.appendChild(el("text",{x:pL-7,y:y+4,"text-anchor":"end",class:"tick"},yv));}
+  const bw=pw/items.length*0.55,step=pw/items.length;
+  items.forEach((it,i)=>{const x=pL+i*step+step/2;const hN=(it.new/max)*ph,hR=(it.repeat/max)*ph;
+    let y=pT+ph;const r1=el("rect",{x:x-bw/2,y:y-hN,width:bw,height:hN,fill:"#03BAB3"});r1.appendChild(el("title",null,`${it.label} new: ${it.new}`));s.appendChild(r1);y-=hN;
+    const r2=el("rect",{x:x-bw/2,y:y-hR,width:bw,height:hR,fill:"#FAB718"});r2.appendChild(el("title",null,`${it.label} repeat: ${it.repeat}`));s.appendChild(r2);
+    s.appendChild(el("text",{x:x,y:H-6,"text-anchor":"middle",class:"tick"},it.label));});
+  host.appendChild(s);}
 
-function renderQuarters(host, quarters){
-  quarters.forEach(q=>{
-    const card=document.createElement("div");card.className="card";
-    card.innerHTML=`<h2>${esc(q.label)} &mdash; sample requests by referrer</h2>
-      <p class="note">${q.total} submissions &middot; ${q.samples.toLocaleString()} samples requested. Shaded bars are non-rep answers.</p>
-      <div class="qhost"></div>`;
-    host.appendChild(card);
-    repBarChart(card.querySelector(".qhost"), q.bars);
-  });
-}
+(function(){
+  const k=DATA.consumption.kpis,t=DATA.team,c=DATA.current,run=DATA.consumption.run;
+  const lead=(c.rows&&c.rows[0])?`${c.rows[0].rep} (${c.rows[0].points})`:"open";
+  const cards=IS_PUBLIC?[
+    [c.label,"Current quarter",`${c.days_left} days left`],
+    [lead,"Current leader","unique doctors signed"],
+    [(c.rows||[]).length,"Reps competing","this quarter"],
+    [fmt(t.clinics),"Doctors reached","all-time, nationwide"],
+    [fmt(t.bottles),"Sample bottles","into clinics all-time"],
+  ]:[
+    [fmt(k.bottles),"Sample bottles",`${fmt(k.drops)} drops`],
+    [k.requests,"Sample requests",`${k.unique_docs} unique doctors`],
+    [k.avg_per_req,"Avg bottles / request","typical order size"],
+    [k.avg_bottles_per_q,"Avg bottles / quarter",`${k.avg_req_per_q} requests/qtr`],
+    [k.reorder_pct+"%","Reorder rate",(k.median_gap?`~${k.median_gap}d between`:"repeat doctors")],
+  ];
+  document.getElementById("kpis").innerHTML=cards.map(x=>`<div class="kpi"><div class="n">${esc(x[0])}</div><div class="l">${esc(x[1])}</div><div class="s">${esc(x[2])}</div></div>`).join("");
+})();
+document.getElementById("cqlabel").textContent=DATA.current.label+" standings";
+document.getElementById("cqdays").textContent=DATA.current.days_left+" days left";
+leaderboard(document.getElementById("leaderboard"),DATA.current);
+pastQ(document.getElementById("past"),DATA.past);
 
-function renderTable(records){
-  if(!records) return;
-  const wrap=document.getElementById("tablewrap");
-  wrap.style.display="block";
-  const headers=[["date","Date"],["clinic","Clinic"],["doctor","Doctor"],["email","Email"],
-    ["phone","Phone"],["address","Shipping address"],["samples","Samples"],["license","License #"],["rep","Referrer"]];
-  document.getElementById("thead").innerHTML=headers.map(h=>`<th data-k="${h[0]}">${esc(h[1])} <span class="arrow"></span></th>`).join("");
-  let sk="date",sd=-1,flt="",rep="";
-  const sel=document.getElementById("repfilter");
-  const reps=[...new Set(records.map(r=>r.rep))].sort();
-  sel.innerHTML='<option value="">All referrers</option>'+reps.map(r=>`<option>${esc(r)}</option>`).join("");
-  function draw(){
-    let rows=records.filter(r=>(!rep||r.rep===rep)&&(!flt||(r.clinic+" "+r.doctor+" "+r.address+" "+r.rep+" "+r.email+" "+r.license).toLowerCase().includes(flt)));
-    rows.sort((a,b)=>{let av=a[sk],bv=b[sk];if(sk==="samples")return(av-bv)*sd;return String(av).localeCompare(String(bv))*sd;});
-    document.getElementById("tbody").innerHTML=rows.map(r=>{
-      const non=NONREP.has(r.rep);
-      return `<tr class="${non?'nonrep':''}"><td>${esc(r.date)}</td><td>${esc(r.clinic)}</td><td>${esc(r.doctor)}</td><td>${esc(r.email)}</td><td>${esc(r.phone)}</td><td>${esc(r.address)}</td><td class="num">${esc(r.samples)}</td><td>${esc(r.license)}</td><td><span class="pill ${non?'g':''}">${esc(r.rep)}</span></td></tr>`;
-    }).join("");
-    document.getElementById("rowcount").textContent=`${rows.length} of ${records.length} submissions`;
-    document.querySelectorAll("#thead th").forEach(th=>th.querySelector(".arrow").textContent=th.dataset.k===sk?(sd<0?"▼":"▲"):"");
+if(!IS_PUBLIC){
+  const c=DATA.consumption;
+  line("byMonth",c.by_month,"bottles");
+  line("reqMonth",c.by_month,"requests","#06827b");
+  line("avgMonth",c.by_month,"avg","#FAB718");
+  line("cumulative",c.cumulative,"total");
+  hbars("byProvince",c.by_province,"bottles");
+  hbars("byRep",c.by_rep,"bottles");
+  vbars("byQuarter",c.by_quarter,"bottles","label","growth");
+  vbars("adoption",c.adoption,"n","k");
+  vbars("orderMix",c.order_mix,"n","k");
+  vbars("reach",c.reach,"new","label");
+  stacked("newrep",c.newrep);
+  const rr=c.run,pct=rr.total?Math.round(rr.elapsed/rr.total*100):0;
+  document.getElementById("runrate").innerHTML=
+    `<div class="n">${fmt(rr.projected)}</div><div class="l">Projected bottles, ${esc(rr.label)}</div>`+
+    `<div class="s">${fmt(rr.so_far)} so far · ${pct}% of quarter elapsed</div>`;
+  if(typeof RECORDS!=="undefined"){
+    const H=[["date","Date"],["clinic","Clinic"],["doctor","Doctor"],["province","Prov"],["phone","Phone"],["address","Address"],["samples","Bottles"],["license","Licence"],["rep","Referrer"]];
+    document.getElementById("thead").innerHTML=H.map(h=>`<th data-k="${h[0]}">${esc(h[1])}</th>`).join("");
+    let sk="date",sd=-1,flt="",rep="";const sel=document.getElementById("repf");
+    sel.innerHTML='<option value="">All referrers</option>'+[...new Set(RECORDS.map(r=>r.rep))].sort().map(r=>`<option>${esc(r)}</option>`).join("");
+    function draw(){let rows=RECORDS.filter(r=>(!rep||r.rep===rep)&&(!flt||(r.clinic+" "+r.doctor+" "+r.address+" "+r.rep+" "+r.license).toLowerCase().includes(flt)));
+      rows.sort((x,y)=>{let a=x[sk],b=y[sk];if(sk==="samples")return(a-b)*sd;return String(a).localeCompare(String(b))*sd;});
+      document.getElementById("tbody").innerHTML=rows.map(r=>`<tr><td>${esc(r.date)}</td><td>${esc(r.clinic)}</td><td>${esc(r.doctor)}</td><td>${esc(r.province)}</td><td>${esc(r.phone)}</td><td>${esc(r.address)}</td><td class="num">${r.samples}</td><td>${esc(r.license)}</td><td>${esc(r.rep)}</td></tr>`).join("");
+      document.getElementById("rc").textContent=`${rows.length} of ${RECORDS.length}`;}
+    document.querySelectorAll("#thead th").forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(k===sk)sd*=-1;else{sk=k;sd=(k==="samples"||k==="date")?-1:1;}draw();});
+    document.getElementById("search").oninput=e=>{flt=e.target.value.toLowerCase().trim();draw();};sel.onchange=e=>{rep=e.target.value;draw();};draw();
   }
-  document.querySelectorAll("#thead th").forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(k===sk)sd*=-1;else{sk=k;sd=(k==="samples"||k==="date")?-1:1;}draw();});
-  document.getElementById("search").oninput=e=>{flt=e.target.value.toLowerCase().trim();draw();};
-  sel.onchange=e=>{rep=e.target.value;draw();};
-  draw();
 }
-
-kpiCards(AGG.kpis);
-renderQuarters(document.getElementById("quarters"), AGG.quarters);
-monthChart(document.getElementById("monthChart"), AGG.months);
-renderTable(typeof RECORDS!=="undefined"?RECORDS:null);
-document.getElementById("stamp").textContent=GENERATED_AT;
-</script>
-</body></html>
+document.getElementById("stamp").textContent=DATA.stamp;
+</script></body></html>
