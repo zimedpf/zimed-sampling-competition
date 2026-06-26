@@ -429,7 +429,8 @@ if(!IS_PUBLIC){
 document.getElementById("stamp").textContent=DATA.stamp;
 """
 
-def page(data, records, is_public):
+def page(data, records, mode, cipher=None):
+    is_public = (mode == "public")
     banner = ('<div class="banner pub">Public standings. Aggregate competition results only — no patient or physician details. Score = unique doctors signed per rep.</div>'
               if is_public else
               '<div class="banner priv"><strong>Confidential — management view.</strong> Sample-consumption analytics plus physician contact detail. Keep private.</div>')
@@ -469,9 +470,15 @@ def page(data, records, is_public):
     <div class="card"><h2>All submissions</h2><p class="note">Click a header to sort; type to filter.</p>
       <div class="toolbar"><input id="search" placeholder="Search clinic, doctor, address, referrer…"><select id="repf"></select><span class="note" id="rc"></span></div>
       <div class="tin"><table><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table></div></div>"""
-    data_js = f"const DATA={dumps(data)};\nconst IS_PUBLIC={'true' if is_public else 'false'};\n"
-    if not is_public: data_js += f"const RECORDS={dumps(records)};\n"
-    robots = '<meta name="robots" content="noindex">' if is_public else ''
+    if mode == "encrypted":
+        boot = f"const IS_PUBLIC=false;\nconst CIPHER={dumps(cipher)};\n" + GATE_JS
+    else:
+        boot = f"const DATA={dumps(data)};\nconst IS_PUBLIC={'true' if is_public else 'false'};\n"
+        if mode == "private":
+            boot += f"const RECORDS={dumps(records)};\n"
+        boot += "renderAll();\n"
+    script = "function renderAll(){\n" + JS + "\n}\n" + boot
+    robots = '<meta name="robots" content="noindex">' if mode != "private" else ''
     foot = ('Source: live JotForm “Zimed PF Sample Request Form”. Competition score = unique doctors who signed and named each rep '
             '(a doctor signing again does not add a point); Krish, Aymeric and non-rep answers are excluded from standings. '
             'Zimed PF (bimatoprost 0.03%) is a <span class="luvo">LUVO</span> brand distributed by Clarion Medical. '
@@ -490,21 +497,80 @@ def page(data, records, is_public):
 <div class="card"><h2>Past quarters</h2><p class="note">Final standings by quarter. 🏆 = winner.</p><div id="past"></div></div>
 {analytics}
 <div class="foot">{foot}</div></div>
-<script>{data_js}{JS}</script></body></html>"""
+<script>{script}</script></body></html>"""
+
+GATE_JS = r"""
+(function(){
+  const u=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+  const ov=document.createElement("div");
+  ov.style.cssText="position:fixed;inset:0;z-index:9999;background:#eef5f4;display:grid;place-items:center;font-family:-apple-system,Segoe UI,Roboto,sans-serif";
+  ov.innerHTML='<div style="background:#fff;border:1px solid #dfeae8;border-radius:14px;padding:28px 30px;max-width:360px;width:90%;text-align:center;box-shadow:0 12px 34px rgba(0,0,0,.10)">'
+   +'<div style="font-size:30px">🔒</div><h2 style="margin:8px 0 4px;color:#06827b">Zimed Management View</h2>'
+   +'<p style="font-size:13px;color:#6a807e;margin:0 0 14px">Enter the passphrase shared with you.</p>'
+   +'<input id="pw" type="password" placeholder="Passphrase" autocomplete="off" style="width:100%;padding:10px 12px;border:1px solid #dfeae8;border-radius:8px;font-size:14px;box-sizing:border-box"/>'
+   +'<div id="gerr" style="color:#c0392b;font-size:12px;height:16px;margin-top:6px"></div>'
+   +'<button id="go" style="margin-top:8px;width:100%;padding:10px;border:0;border-radius:8px;background:#03BAB3;color:#fff;font-weight:700;font-size:14px;cursor:pointer">Unlock</button></div>';
+  document.body.appendChild(ov);
+  async function unlock(pass){
+    try{
+      const enc=new TextEncoder(),dec=new TextDecoder();
+      const km=await crypto.subtle.importKey("raw",enc.encode(pass),"PBKDF2",false,["deriveKey"]);
+      const key=await crypto.subtle.deriveKey({name:"PBKDF2",salt:u(CIPHER.s),iterations:200000,hash:"SHA-256"},km,{name:"AES-GCM",length:256},false,["decrypt"]);
+      const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:u(CIPHER.iv)},key,u(CIPHER.ct));
+      const obj=JSON.parse(dec.decode(pt));
+      window.DATA=obj.DATA;window.RECORDS=obj.RECORDS;ov.remove();renderAll();
+    }catch(e){document.getElementById("gerr").textContent="Wrong passphrase. Try again.";}
+  }
+  const go=()=>unlock(document.getElementById("pw").value);
+  ov.querySelector("#go").onclick=go;
+  ov.querySelector("#pw").addEventListener("keydown",e=>{if(e.key==="Enter")go();});
+  ov.querySelector("#pw").focus();
+})();
+"""
+
+def encrypt_payload(passphrase, obj):
+    import hashlib
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    pt = json.dumps(obj, ensure_ascii=False).encode()
+    # Deterministic salt/IV derived from (passphrase, plaintext): identical data ->
+    # identical ciphertext (so the scheduled commit is a no-op when data is unchanged),
+    # while any data change yields a fresh salt+nonce. No nonce reuse across different
+    # plaintexts because both derive from the plaintext hash.
+    seed = hashlib.sha256(passphrase.encode() + b"|" + pt).digest()
+    salt = seed[:16]
+    iv = hashlib.sha256(b"iv|" + seed).digest()[:12]
+    key = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=200000).derive(passphrase.encode())
+    ct = AESGCM(key).encrypt(iv, pt, None)
+    b = lambda x: base64.b64encode(x).decode()
+    return {"s": b(salt), "iv": b(iv), "ct": b(ct)}
 
 def pii_guard(html, records):
     return [v for r in records for f in ("email", "phone") if (v := r.get(f)) and v in html]
 
 def main():
     args = set(sys.argv[1:])
-    public_only = "--public-only" in args
     out_dir = sys.argv[sys.argv.index("--out")+1] if "--out" in sys.argv else "."
     records = fetch_records()
     data = build(records)
-    pub = page(data, None, True)
+
+    if "--encrypted" in args:
+        pw = os.environ.get("MGMT_PASSPHRASE")
+        if not pw: sys.exit("MGMT_PASSPHRASE env not set; refusing to build management page.")
+        cipher = encrypt_payload(pw, {"DATA": data, "RECORDS": records})
+        html = page(data, records, "encrypted", cipher)
+        leak = pii_guard(html, records)
+        if leak: sys.exit(f"ABORT: {len(leak)} PII values leaked into the encrypted file (should be impossible).")
+        os.makedirs(out_dir, exist_ok=True)
+        open(os.path.join(out_dir, "index.html"), "w").write(html)
+        print(f"records={len(records)} -> {out_dir}/index.html (ENCRYPTED management view, no plaintext PII)")
+        return
+
+    pub = page(data, None, "public")
     leak = pii_guard(pub, records)
     if leak: sys.exit(f"ABORT: {len(leak)} PII values would leak into public file.")
-    if public_only:
+    if "--public-only" in args:
         os.makedirs(out_dir, exist_ok=True)
         open(os.path.join(out_dir, "index.html"), "w").write(pub)
         print(f"records={len(records)} reached={data['team']['clinics']} bottles={data['team']['bottles']} PII=OK -> {out_dir}/index.html")
@@ -512,7 +578,7 @@ def main():
         os.makedirs(os.path.join(OUT, "public"), exist_ok=True)
         os.makedirs(os.path.join(OUT, "private"), exist_ok=True)
         open(os.path.join(OUT, "public", "index.html"), "w").write(pub)
-        open(os.path.join(OUT, "private", "index.html"), "w").write(page(data, records, False))
+        open(os.path.join(OUT, "private", "index.html"), "w").write(page(data, records, "private"))
         print(f"records={len(records)} reached={data['team']['clinics']} bottles={data['team']['bottles']} PII=OK -> out/public + out/private")
 
 if __name__ == "__main__":

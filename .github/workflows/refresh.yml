@@ -16,18 +16,23 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      - name: Build public dashboard
+      - name: Install deps
+        run: pip install --quiet cryptography
+      - name: Build public board
         env:
           JOTFORM_API_KEY: ${{ secrets.JOTFORM_API_KEY }}
         run: python generate.py --public-only --out .
+      - name: Build encrypted management view
+        env:
+          JOTFORM_API_KEY: ${{ secrets.JOTFORM_API_KEY }}
+          MGMT_PASSPHRASE: ${{ secrets.MGMT_PASSPHRASE }}
+        run: |
+          mkdir -p m-2ca38f6f79
+          python generate.py --encrypted --out m-2ca38f6f79
       - name: Commit if changed
         run: |
           git config user.name "zimed-dash-bot"
           git config user.email "dashboard@zimedpf.local"
-          git add index.html
-          if git diff --cached --quiet; then
-            echo "No change."
-          else
-            git commit -m "Auto-refresh dashboard $(date -u +%Y-%m-%dT%H:%MZ)"
-            git push
-          fi
+          git add index.html m-2ca38f6f79/index.html
+          if git diff --cached --quiet; then echo "No change."; else
+            git commit -m "Auto-refresh dashboard $(date -u +%Y-%m-%dT%H:%MZ)"; git push; fi
