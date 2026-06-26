@@ -1,1 +1,142 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>Zimed Sampling Competition</title><style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#f4f6f8;color:#1f2d3d;display:grid;place-items:center;height:100vh;margin:0}.c{text-align:center}</style></head><body><div class="c"><h1>Zimed Sampling Competition</h1><p>Live dashboard is being wired up. Check back shortly.</p></div></body></html>
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
+<title>Zimed Sampling Competition</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--ink:#1f2d3d;--muted:#6b7a8d;--line:#e3e8ee;--primary:#0e7c86;--accent:#f2785c;--grey:#b8c2cc;--grey-soft:#d7dde3;}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+header{background:linear-gradient(120deg,#0e7c86,#0a5f67);color:#fff;padding:24px 32px 20px}
+header h1{margin:0;font-size:21px}header .sub{margin-top:5px;font-size:13px;opacity:.9}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 22px 60px}
+.banner{border-radius:8px;padding:9px 14px;font-size:12.5px;margin:16px 0 4px}
+.banner.pub{background:#eef6f7;border:1px solid #bfe0e3;color:#0a5f67}
+.banner.priv{background:#fff4f1;border:1px solid #f7b3a3;color:#9c3b25}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:13px;margin:16px 0 12px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 15px}
+.kpi .n{font-size:23px;font-weight:700;line-height:1}.kpi .l{font-size:12px;color:var(--muted);margin-top:6px}.kpi .s{font-size:11px;color:var(--muted);margin-top:3px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px 14px;margin-top:16px}
+.card h2{margin:0 0 2px;font-size:15px}.card .note{font-size:11.5px;color:var(--muted);margin:0 0 8px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}.cols .card{margin-top:0}
+svg{width:100%;height:auto;display:block;overflow:visible}
+.gridline{stroke:#eef2f6}.axis{stroke:var(--line)}.tick{fill:var(--muted);font-size:11px}
+.blab{fill:var(--ink);font-size:11px}.vlab{fill:var(--ink);font-size:11px;font-weight:600}.bar:hover{opacity:.82}
+.toolbar{display:flex;gap:10px;align-items:center;margin:6px 0 12px;flex-wrap:wrap}
+.toolbar input{flex:1;min-width:220px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px}
+.toolbar select{padding:8px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff}
+.toolbar .count{font-size:12px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{position:sticky;top:0;background:#f0f4f6;cursor:pointer;font-size:11.5px;text-transform:uppercase;letter-spacing:.3px;color:#46586b;white-space:nowrap}
+td.num{text-align:right;font-variant-numeric:tabular-nums}.tablewrapin{max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+tr.nonrep td{background:#fbfbf3}.pill{display:inline-block;padding:1px 8px;border-radius:20px;font-size:11px;font-weight:600;background:#dff0f1;color:#0a5f67}.pill.g{background:var(--grey-soft);color:#4b5a68}
+.foot{font-size:11.5px;color:var(--muted);margin-top:24px;line-height:1.5}
+@media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}.cols{grid-template-columns:1fr}}
+</style></head><body>
+<header><h1>Zimed Sampling Competition</h1>
+<div class="sub">Live from JotForm · sample requests by referrer, one chart per quarter</div></header>
+<div class="wrap">
+<div class="banner pub">Public view. Aggregate competition standings only, no patient or physician details.</div>
+<div class="kpis" id="kpis"></div>
+<div class="card"><h2>Submissions by month (2026)</h2><p class="note">Sample request forms submitted each month this year.</p><div id="monthChart"></div></div>
+<div id="quarters"></div>
+
+<div class="foot">Source: live JotForm “Zimed PF Sample Request Form”. Counts are raw (every submission as entered, including non-rep answers and internal rep-stock orders). Auto-refreshed; last updated <span id="stamp"></span>.</div>
+</div>
+<script>const AGG={"quarters": [{"label": "Q2 2026", "year": "2026", "q": 2, "bars": [{"rep": "Krish Khurana", "count": 42}, {"rep": "Aymeric Paillet", "count": 38}, {"rep": "Unsure", "count": 3}, {"rep": "Craig Fitch", "count": 2}, {"rep": "Another doctor", "count": 1}, {"rep": "Jessica Linder", "count": 1}, {"rep": "Martin Coutu", "count": 1}], "total": 88, "samples": 2260}, {"label": "Q1 2026", "year": "2026", "q": 1, "bars": [{"rep": "Krish Khurana", "count": 21}, {"rep": "Rawn Stokoe", "count": 5}, {"rep": "Craig Fitch", "count": 3}, {"rep": "Jessica Linder", "count": 2}, {"rep": "Another doctor", "count": 1}, {"rep": "Martin Coutu", "count": 1}], "total": 33, "samples": 780}, {"label": "Q4 2025", "year": "2025", "q": 4, "bars": [{"rep": "Rawn Stokoe", "count": 20}, {"rep": "Jessica Linder", "count": 17}, {"rep": "Martin Coutu", "count": 17}, {"rep": "Craig Fitch", "count": 16}, {"rep": "Krish Khurana", "count": 14}, {"rep": "Antoine Escher", "count": 3}, {"rep": "Another doctor", "count": 2}, {"rep": "Tyler Davis", "count": 1}, {"rep": "Unsure", "count": 1}], "total": 91, "samples": 1970}, {"label": "Q3 2025", "year": "2025", "q": 3, "bars": [{"rep": "Krish Khurana", "count": 47}, {"rep": "Craig Fitch", "count": 25}, {"rep": "Martin Coutu", "count": 18}, {"rep": "Rawn Stokoe", "count": 13}, {"rep": "Unsure", "count": 6}, {"rep": "Max Waibler", "count": 5}, {"rep": "(blank)", "count": 4}, {"rep": "Kevin Davis", "count": 1}, {"rep": "Antoine Escher", "count": 1}], "total": 120, "samples": 4920}, {"label": "Q2 2025", "year": "2025", "q": 2, "bars": [{"rep": "(blank)", "count": 24}], "total": 24, "samples": 1160}], "months": [{"label": "Jan", "key": "2026-01", "count": 15}, {"label": "Feb", "key": "2026-02", "count": 15}, {"label": "Mar", "key": "2026-03", "count": 3}, {"label": "Apr", "key": "2026-04", "count": 15}, {"label": "May", "key": "2026-05", "count": 36}, {"label": "Jun", "key": "2026-06", "count": 37}], "kpis": {"year": "2026", "submissions": 121, "samples": 3040, "referrers": 8, "top_rep": "Krish Khurana", "top_rep_n": 63, "latest": "2026-06-26", "all_time": 356}};
+const GENERATED_AT="2026-06-26 17:37";
+
+const SVGNS="http://www.w3.org/2000/svg";
+function el(t,a,x){const e=document.createElementNS(SVGNS,t);for(const k in a)e.setAttribute(k,a[k]);if(x!=null)e.textContent=x;return e;}
+function svg(w,h){return el("svg",{viewBox:`0 0 ${w} ${h}`,width:w,height:h});}
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const NONREP=new Set(["Unsure","Another doctor","(blank)"]);
+
+function kpiCards(k){
+  const cards=[
+    [k.submissions, `Submissions (${k.year})`, "year to date"],
+    [k.samples.toLocaleString(), "Samples requested", `${k.year} year to date`],
+    [k.referrers, "Referrers", "distinct names on forms"],
+    [k.top_rep_n, "Top referrer", esc(k.top_rep)],
+    [k.latest, "Latest submission", `${k.all_time} all-time`],
+  ];
+  document.getElementById("kpis").innerHTML=cards.map(c=>
+    `<div class="kpi"><div class="n">${esc(c[0])}</div><div class="l">${esc(c[1])}</div><div class="s">${esc(c[2])}</div></div>`).join("");
+}
+
+function repBarChart(host, bars){
+  const W=860,rowH=32,padL=160,padR=64,padT=8,H=padT+bars.length*rowH+8;
+  const max=Math.max(1,...bars.map(b=>b.count));
+  const s=svg(W,H),x0=padL,xW=W-padL-padR;
+  bars.forEach((b,i)=>{
+    const y=padT+i*rowH+5,bw=Math.max(2,(b.count/max)*xW),non=NONREP.has(b.rep);
+    s.appendChild(el("text",{x:x0-10,y:y+13,"text-anchor":"end",class:"blab"},b.rep));
+    const rc=el("rect",{x:x0,y:y,width:bw,height:rowH-13,rx:4,fill:non?"var(--grey)":"var(--primary)",class:"bar"});
+    rc.appendChild(el("title",null,`${b.rep}: ${b.count}`));s.appendChild(rc);
+    s.appendChild(el("text",{x:x0+bw+8,y:y+13,class:"vlab"},b.count));
+  });
+  host.appendChild(s);
+}
+
+function monthChart(host, months){
+  if(!months.length) return;
+  const W=520,H=240,padL=34,padR=16,padT=16,padB=30;
+  const vals=months.map(m=>m.count),max=Math.max(5,...vals),plotW=W-padL-padR,plotH=H-padT-padB;
+  const s=svg(W,H);
+  for(let g=0;g<=4;g++){const yv=Math.round(max*g/4),y=padT+plotH-(yv/max)*plotH;
+    s.appendChild(el("line",{x1:padL,y1:y,x2:W-padR,y2:y,class:"gridline"}));
+    s.appendChild(el("text",{x:padL-8,y:y+4,"text-anchor":"end",class:"tick"},yv));}
+  const st=plotW/Math.max(1,months.length-1);
+  const pts=vals.map((v,i)=>[padL+i*st,padT+plotH-(v/max)*plotH]);
+  let dp="";pts.forEach((p,i)=>dp+=(i?"L":"M")+p[0]+" "+p[1]+" ");
+  if(pts.length>1){s.appendChild(el("path",{d:dp+`L ${pts[pts.length-1][0]} ${padT+plotH} L ${pts[0][0]} ${padT+plotH} Z`,fill:"rgba(14,124,134,.10)"}));
+    s.appendChild(el("path",{d:dp,fill:"none",stroke:"var(--primary)","stroke-width":2.5}));}
+  pts.forEach((p,i)=>{const c=el("circle",{cx:p[0],cy:p[1],r:4,fill:"#fff",stroke:"var(--primary)","stroke-width":2.5});
+    c.appendChild(el("title",null,`${months[i].label}: ${vals[i]}`));s.appendChild(c);
+    s.appendChild(el("text",{x:p[0],y:p[1]-9,"text-anchor":"middle",class:"vlab"},vals[i]));
+    s.appendChild(el("text",{x:p[0],y:H-10,"text-anchor":"middle",class:"tick"},months[i].label));});
+  host.appendChild(s);
+}
+
+function renderQuarters(host, quarters){
+  quarters.forEach(q=>{
+    const card=document.createElement("div");card.className="card";
+    card.innerHTML=`<h2>${esc(q.label)} &mdash; sample requests by referrer</h2>
+      <p class="note">${q.total} submissions &middot; ${q.samples.toLocaleString()} samples requested. Shaded bars are non-rep answers.</p>
+      <div class="qhost"></div>`;
+    host.appendChild(card);
+    repBarChart(card.querySelector(".qhost"), q.bars);
+  });
+}
+
+function renderTable(records){
+  if(!records) return;
+  const wrap=document.getElementById("tablewrap");
+  wrap.style.display="block";
+  const headers=[["date","Date"],["clinic","Clinic"],["doctor","Doctor"],["email","Email"],
+    ["phone","Phone"],["address","Shipping address"],["samples","Samples"],["license","License #"],["rep","Referrer"]];
+  document.getElementById("thead").innerHTML=headers.map(h=>`<th data-k="${h[0]}">${esc(h[1])} <span class="arrow"></span></th>`).join("");
+  let sk="date",sd=-1,flt="",rep="";
+  const sel=document.getElementById("repfilter");
+  const reps=[...new Set(records.map(r=>r.rep))].sort();
+  sel.innerHTML='<option value="">All referrers</option>'+reps.map(r=>`<option>${esc(r)}</option>`).join("");
+  function draw(){
+    let rows=records.filter(r=>(!rep||r.rep===rep)&&(!flt||(r.clinic+" "+r.doctor+" "+r.address+" "+r.rep+" "+r.email+" "+r.license).toLowerCase().includes(flt)));
+    rows.sort((a,b)=>{let av=a[sk],bv=b[sk];if(sk==="samples")return(av-bv)*sd;return String(av).localeCompare(String(bv))*sd;});
+    document.getElementById("tbody").innerHTML=rows.map(r=>{
+      const non=NONREP.has(r.rep);
+      return `<tr class="${non?'nonrep':''}"><td>${esc(r.date)}</td><td>${esc(r.clinic)}</td><td>${esc(r.doctor)}</td><td>${esc(r.email)}</td><td>${esc(r.phone)}</td><td>${esc(r.address)}</td><td class="num">${esc(r.samples)}</td><td>${esc(r.license)}</td><td><span class="pill ${non?'g':''}">${esc(r.rep)}</span></td></tr>`;
+    }).join("");
+    document.getElementById("rowcount").textContent=`${rows.length} of ${records.length} submissions`;
+    document.querySelectorAll("#thead th").forEach(th=>th.querySelector(".arrow").textContent=th.dataset.k===sk?(sd<0?"▼":"▲"):"");
+  }
+  document.querySelectorAll("#thead th").forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(k===sk)sd*=-1;else{sk=k;sd=(k==="samples"||k==="date")?-1:1;}draw();});
+  document.getElementById("search").oninput=e=>{flt=e.target.value.toLowerCase().trim();draw();};
+  sel.onchange=e=>{rep=e.target.value;draw();};
+  draw();
+}
+
+kpiCards(AGG.kpis);
+renderQuarters(document.getElementById("quarters"), AGG.quarters);
+monthChart(document.getElementById("monthChart"), AGG.months);
+renderTable(typeof RECORDS!=="undefined"?RECORDS:null);
+document.getElementById("stamp").textContent=GENERATED_AT;
+</script>
+</body></html>

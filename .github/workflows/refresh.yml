@@ -1,0 +1,33 @@
+name: refresh-dashboard
+on:
+  schedule:
+    - cron: '*/20 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Build public dashboard
+        env:
+          JOTFORM_API_KEY: ${{ secrets.JOTFORM_API_KEY }}
+        run: python generate.py --public-only --out .
+      - name: Commit if changed
+        run: |
+          git config user.name "zimed-dash-bot"
+          git config user.email "dashboard@zimedpf.local"
+          git add index.html
+          if git diff --cached --quiet; then
+            echo "No change."
+          else
+            git commit -m "Auto-refresh dashboard $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push
+          fi
