@@ -281,7 +281,7 @@ def page(agg, records, is_public, generated_at):
     data_js += f"const GENERATED_AT={json.dumps(generated_at)};\n"
     robots = '<meta name="robots" content="noindex">' if is_public else ''
     foot = ("Source: live JotForm “Zimed PF Sample Request Form”. Counts are raw (every submission as entered, including non-rep answers and internal rep-stock orders). "
-            "Auto-refreshed; last updated <span id=\"stamp\"></span>.")
+            "Auto-refreshed from JotForm about every 20 minutes · <span id=\"stamp\"></span>.")
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">{robots}
 <title>Zimed Sampling Competition{'' if is_public else ' — Full Detail'}</title>
@@ -321,7 +321,9 @@ def main():
 
     records = fetch_records()
     agg = build_aggregates(records)
-    generated_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M %Z").strip()
+    # Data-derived stamp (NOT wall clock) so an unchanged dataset produces a
+    # byte-identical file and the scheduled Action commits only on real change.
+    generated_at = f"data through {agg['kpis']['latest']} ({agg['kpis']['all_time']} submissions all-time)"
 
     public_html = page(agg, None, True, generated_at)
     leak = pii_guard(public_html, records)
