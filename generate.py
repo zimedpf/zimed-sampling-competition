@@ -454,6 +454,17 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);
 .rrfill{height:100%;background:linear-gradient(90deg,var(--teal-d),var(--teal));border-radius:8px;transition:width .9s cubic-bezier(.2,.8,.2,1)}
 .rrleg{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:12px;color:var(--muted)}
 .rrleg b{color:var(--ink);font-size:13px}
+.chleg{display:flex;flex-wrap:wrap;gap:7px 16px;margin:0 0 13px;font-size:11px;color:var(--muted)}
+.chleg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.tip{position:relative;display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;margin-left:7px;
+ border:1px solid var(--line);border-radius:50%;font-family:var(--body);font-weight:700;font-size:10px;font-style:italic;
+ color:var(--teal-d);cursor:help;vertical-align:middle}
+.tipc{visibility:hidden;opacity:0;transition:opacity .15s ease;position:absolute;z-index:60;left:0;top:150%;
+ width:min(330px,80vw);background:var(--abyss2);color:#EAF7F4;border:1px solid rgba(255,255,255,.12);border-radius:11px;
+ padding:13px 14px;font-family:var(--body);font-size:11.5px;font-weight:400;font-style:normal;line-height:1.6;
+ letter-spacing:0;text-transform:none;text-align:left;box-shadow:0 18px 44px rgba(0,0,0,.4)}
+.tipc b{color:#fff}
+.tip:hover .tipc,.tip:focus .tipc{visibility:visible;opacity:1}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px 16px;margin-top:14px;
  box-shadow:0 1px 2px rgba(12,38,36,.03)}
 .card h2{margin:0 0 3px;font-family:var(--disp);font-size:16px;font-weight:700;letter-spacing:-.01em}
@@ -762,12 +773,22 @@ function salesProvince(id,items){const host=document.getElementById(id);if(!host
   items.forEach(it=>{const row=document.createElement("div");row.className="hbar sales";
     row.innerHTML=`<div title="${esc(it.k)}">${esc(it.k)}</div><div class="t"><div class="f gold" style="width:${Math.max(3,it.revenue/max*100)}%"></div></div><div class="v">${money(it.revenue)}<span class="vu">${fmt(it.units)} bottles</span></div>`;
     w.appendChild(row);});host.appendChild(w);}
+const CHCOL={national:"#06827B",retail:"#C98A00",regional:"#8AA3A0",other:"#B9C9C6"};
+const CHLAB={national:"National wholesaler",retail:"Retail chain (self-distributing)",regional:"Regional wholesaler",other:"Other / direct"};
 function salesCustomers(id,items){const host=document.getElementById(id);if(!host)return;
   if(!items||!items.length){host.innerHTML='<p class="note">No sales data.</p>';return;}
   const max=Math.max(1,...items.map(i=>i.revenue));host.innerHTML="";
+  // legend only shows the channel types actually present, in a stable order
+  const order=["national","retail","regional","other"];
+  const used=order.filter(t=>items.some(i=>(i.type||"other")===t));
+  const leg=document.createElement("div");leg.className="chleg";
+  leg.innerHTML=used.map(t=>`<span><i style="background:${CHCOL[t]}"></i>${esc(CHLAB[t])}</span>`).join("");
+  host.appendChild(leg);
   const w=document.createElement("div");w.className="hbars";
-  items.forEach(it=>{const row=document.createElement("div");row.className="hbar cust";
-    row.innerHTML=`<div title="${esc(it.k)}">${esc(it.k)}</div><div class="t"><div class="f gold" style="width:${Math.max(3,it.revenue/max*100)}%"></div></div><div class="v">${money(it.revenue)}</div>`;
+  items.forEach(it=>{const t=it.type||"other";const col=CHCOL[t]||CHCOL.other;
+    const tip=`${it.k} (${CHLAB[t]||t}). ${it.note||""}`.trim();
+    const row=document.createElement("div");row.className="hbar cust";
+    row.innerHTML=`<div title="${esc(tip)}">${esc(it.k)}</div><div class="t"><div class="f" style="width:${Math.max(3,it.revenue/max*100)}%;background:${col}"></div></div><div class="v" title="${esc(tip)}">${money(it.revenue)}</div>`;
     w.appendChild(row);});host.appendChild(w);}
 function buildSalesCombo(items){
   const W=520,H=220,pL=40,pR=46,pT=18,pB=28,u=items.map(i=>i.units),rev=items.map(i=>i.revenue);
@@ -949,7 +970,16 @@ def page(data, records, mode, cipher=None):
                   f'<strong>{sales_through}</strong>. Confidential — this lives only inside this encrypted page, never on the public board.</p></div>')
     C_SALES_MONTH    = '<div class="card"><h2>Sales by month</h2><p class="note"><span class="pill">teal bars = units sold</span> &nbsp;<span class="pill" style="background:#FCF3DC;color:#9a6b00">gold line = revenue $</span></p><div id="salesMonth"></div></div>'
     C_SALES_PROVINCE = '<div class="card"><h2>Sales by province</h2><p class="note">Net revenue and paid units sold per province (wholesaler ship-to location).</p><div id="salesProvince"></div></div>'
-    C_SALES_CUSTOMERS= '<div class="card"><h2>Top wholesalers</h2><p class="note">Distributors buying Zimed, by net revenue (all-time).</p><div id="salesCustomers"></div></div>'
+    C_SALES_CUSTOMERS= ('<div class="card"><h2>Top distribution customers'
+        '<span class="tip" tabindex="0">i<span class="tipc">'
+        '<b>How Zimed reaches patients.</b> Most of our product does not go straight to pharmacies. '
+        '<b>National wholesalers</b> (McKesson, Kohl &amp; Frisch) are middlemen that re-sell and deliver Zimed to thousands of independent and banner pharmacies we never see on the invoice. '
+        '<b>Retail chains</b> (Shoppers, Jean Coutu, Familiprix) buy centrally and stock their own stores, so one listing decision reaches hundreds of locations. '
+        '<b>Regional wholesalers</b> (LPG, Imperial, Unipharm, Nu-Quest) cover provinces the big two serve thinly, for example Nu-Quest is the main route into Newfoundland. '
+        'Demand is created upstream by the eye doctors who prescribe and at the pharmacy counter, so with wholesalers the goal is staying listed and in stock, while chains and prescribers are where direct selling moves the needle.'
+        '</span></span></h2>'
+        '<p class="note">Distributors buying Zimed by net revenue (all-time). Bars are coloured by channel type; hover a name to see what each one is.</p>'
+        '<div id="salesCustomers"></div></div>')
     C_SAMPLES_VS_SALES = ('<div class="card"><h2>Samples vs sales by province</h2><p class="note"><span class="pill">teal = sampled (free)</span> &nbsp;'
                           '<span class="pill" style="background:#FCF3DC;color:#9a6b00">gold = sold (paid)</span> &nbsp; '
                           'Directional — sample province is the clinic, sales province is the wholesaler depot.</p><div id="samplesVsSales"></div></div>')
