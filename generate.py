@@ -30,7 +30,7 @@ QID = {"doctor":"2","email":"3","phone":"4","address":"5","samples":"6",
        "license":"9","clinic":"14","rep":"23"}
 
 # --- Competition config (edit here) ---------------------------------------
-EXCLUDE = {"Krish Khurana", "Aymeric Paillet", "Unsure", "Another doctor", "(blank)", ""}
+EXCLUDE = {"Krish Khurana", "Aymeric Paillet", "(blank)", ""}
 PRIZES = [1000, 500, 250]
 DROPS_PER_BOTTLE = 100
 PROV = {"british columbia":"BC","bc":"BC","alberta":"AB","ab":"AB","saskatchewan":"SK",
@@ -495,7 +495,7 @@ def page(data, records, mode, cipher=None):
     script = "function renderAll(){\n" + JS + "\n}\n" + boot
     robots = '<meta name="robots" content="noindex">' if mode != "private" else ''
     foot = ('Source: live JotForm “Zimed PF Sample Request Form”. Competition score = unique doctors who signed and named each rep '
-            '(a doctor signing again does not add a point); Krish, Aymeric and non-rep answers are excluded from standings. '
+            '(a doctor signing again does not add a point); Krish and Aymeric are excluded from standings. '
             'Zimed PF (bimatoprost 0.03%) is a <span class="luvo">LUVO</span> brand distributed by Clarion Medical. '
             'Auto-refreshed about every 20 minutes · <span id="stamp"></span>.')
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
