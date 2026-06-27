@@ -167,32 +167,50 @@ def qkey(r): return f"{r['year']}-Q{r['q']}"
 def qlabel(y, q): return f"Q{q} {y}"
 def quarter_end(y, q): return datetime.date(y, *{1:(3,31),2:(6,30),3:(9,30),4:(12,31)}[q])
 
+# Contest periods. The contest normally runs per QUARTER, but Bryan + Krish set the first
+# half of 2026 (Q1+Q2 2026) as a single combined payout period "H1 2026". That is a one-time
+# exception — Q3 2026 onward go back to quarters. To add another combined period later, extend
+# COMBINED with {(year, (q1,q2,...)): ("Label", (start_m,start_d), (end_m,end_d))}.
+COMBINED = {(2026, (1, 2)): ("H1 2026", (1, 1), (6, 30))}
+def period_of(year, q):
+    """Map a (year, quarter) to its contest period -> (key, label, start_date, end_date)."""
+    y = int(year)
+    for (cy, qs), (label, sd, ed) in COMBINED.items():
+        if y == cy and q in qs:
+            return (f"{cy}-{label.split()[0]}", label, datetime.date(cy, *sd), datetime.date(cy, *ed))
+    start = datetime.date(y, {1: 1, 2: 4, 3: 7, 4: 10}[q], 1)
+    return (f"{y}-Q{q}", qlabel(y, q), start, quarter_end(y, q))
+
 def build_competition(records, today, current_reps):
-    buckets = {}
-    qdocs = {}  # quarter -> set of unique doctors across ALL contest participants
+    buckets = {}  # period key -> rep -> set of unique doctors
+    qdocs = {}    # period key -> set of unique doctors across ALL contest participants
+    pmeta = {}    # period key -> (label, end_date)
     for r in records:
-        # Quarter-level unique-doctor total: every participant except Krish/Aymeric/blank
+        pkey, plabel, _ps, pend = period_of(r["year"], r["q"])
+        pmeta[pkey] = (plabel, pend)
+        # Period-level unique-doctor total: every participant except Krish/Aymeric/blank
         # (blanks are remapped to Krish). Includes "Unsure"/"Another doctor" and departed reps.
         if r["rep"] not in EXCLUDE:
-            qdocs.setdefault((r["year"], r["q"]), set()).add(r["dkey"])
+            qdocs.setdefault(pkey, set()).add(r["dkey"])
         # Per-rep scoring: excluded-free AND still a valid current dropdown option.
         if r["rep"] in EXCLUDE or r["rep"] not in current_reps: continue
-        buckets.setdefault((r["year"], r["q"]), {}).setdefault(r["rep"], set()).add(r["dkey"])
+        buckets.setdefault(pkey, {}).setdefault(r["rep"], set()).add(r["dkey"])
     def rows(key):
         reps = buckets.get(key, {})
         return [{"rep": rep, "points": n} for rep, n in
                 sorted(((rep, len(ds)) for rep, ds in reps.items()), key=lambda x: -x[1])]
     udocs = lambda key: len(qdocs.get(key, ()))
     cy, cq = today.year, (today.month-1)//3+1
-    days_left = (quarter_end(cy, cq) - today).days
-    current = {"label": qlabel(cy, cq), "days_left": max(0, days_left),
-               "prizes": PRIZES, "rows": rows((str(cy), cq)), "udocs": udocs((str(cy), cq))}
+    ckey, clabel, _cs, cend = period_of(cy, cq)
+    current = {"label": clabel, "days_left": max(0, (cend - today).days),
+               "prizes": PRIZES, "rows": rows(ckey), "udocs": udocs(ckey)}
     past = []
-    for (y, q) in sorted(buckets, reverse=True):
-        if (int(y), q) == (cy, cq): continue
-        rr = rows((y, q))
-        past.append({"label": qlabel(y, q), "rows": rr, "winner": rr[0]["rep"] if rr else None,
-                     "udocs": udocs((y, q))})
+    for pkey in sorted(pmeta, key=lambda k: pmeta[k][1], reverse=True):
+        if pkey == ckey: continue
+        rr = rows(pkey)
+        if not rr and udocs(pkey) == 0: continue  # skip empty periods (e.g. all-blank quarters)
+        past.append({"label": pmeta[pkey][0], "rows": rr, "winner": rr[0]["rep"] if rr else None,
+                     "udocs": udocs(pkey)})
     return current, past
 
 def build_consumption(records, today, current_reps):
@@ -267,12 +285,12 @@ def build_consumption(records, today, current_reps):
     median_gap = gaps[len(gaps)//2] if gaps else None
 
     nq = len(qs) or 1
-    # run-rate for current quarter
+    # run-rate + projection for the current CONTEST PERIOD (a quarter, or H1 2026)
     cy, cq = today.year, (today.month-1)//3+1
-    qstart = datetime.date(cy, {1:1,2:4,3:7,4:10}[cq], 1)
-    qend = quarter_end(cy, cq)
-    cur_b = sum(r["samples"] for r in records if r["year"]==str(cy) and r["q"]==cq)
-    elapsed = (today - qstart).days + 1; total_days = (qend - qstart).days + 1
+    pkey, plabel, pstart, pend = period_of(cy, cq)
+    period_recs = [r for r in records if period_of(r["year"], r["q"])[0] == pkey]
+    cur_b = sum(r["samples"] for r in period_recs)
+    elapsed = (today - pstart).days + 1; total_days = (pend - pstart).days + 1
     frac = elapsed / total_days if total_days else 1
     projected = round(cur_b / elapsed * total_days) if elapsed > 0 else cur_b
 
@@ -326,17 +344,16 @@ def build_consumption(records, today, current_reps):
             momentum.append({"k": rep, "series": series})
     momentum.sort(key=lambda m: -sum(s["n"] for s in m["series"]))
 
-    # competition projection: current-quarter unique doctors per rep, projected at pace
+    # competition projection: current-period unique doctors per rep, projected at pace
     proj = []
     for rep in eligible:
-        now = len(set(r["dkey"] for r in records
-                      if r["rep"] == rep and r["year"] == str(cy) and r["q"] == cq))
+        now = len(set(r["dkey"] for r in period_recs if r["rep"] == rep))
         projected_docs = round(now/frac) if frac > 0 else now
         if now or projected_docs:
             proj.append({"k": rep, "now": now, "proj": max(projected_docs, now)})
     proj.sort(key=lambda x: (-x["proj"], -x["now"]))
-    projection = {"label": qlabel(cy, cq), "pct_elapsed": round(frac*100),
-                  "days_left": max(0, (qend - today).days), "rows": proj}
+    projection = {"label": plabel, "pct_elapsed": round(frac*100),
+                  "days_left": max(0, (pend - today).days), "rows": proj}
 
     return {
         "kpis": {"bottles": bottles, "drops": bottles*DROPS_PER_BOTTLE, "requests": len(records),
@@ -347,7 +364,7 @@ def build_consumption(records, today, current_reps):
         "by_month": by_month, "cumulative": cum, "by_province": by_province, "by_rep": by_rep,
         "by_quarter": by_quarter, "adoption": adoption, "order_mix": order_mix,
         "reach": reach, "newrep": newrep,
-        "run": {"label": qlabel(cy, cq), "so_far": cur_b, "projected": projected,
+        "run": {"label": plabel, "so_far": cur_b, "projected": projected,
                 "elapsed": elapsed, "total": total_days},
         "by_region": by_region, "lapsed": lapsed, "efficiency": efficiency,
         "dq": dq, "momentum": momentum, "projection": projection,
@@ -539,10 +556,11 @@ function pastQ(host,past){
   past.forEach(q=>{const b=document.createElement("div");b.className="qbox";
     let h=`<h3>${esc(q.label)}</h3><div class="qtot">${fmt(q.udocs)} unique doctor${q.udocs===1?'':'s'} signed</div>`;
     const rows=q.rows||[];
-    const repPts=rows.filter(r=>!NONREP.has(r.rep)).map(r=>r.points);
-    const top=repPts.length?Math.max(...repPts):null;   // winner = top real rep(s)
-    rows.slice(0,5).forEach(r=>{const non=NONREP.has(r.rep),win=!non&&r.points===top;
-      h+=`<div class="r${win?' win':''}${non?' non':''}"><span>${win?'🏆 ':''}${esc(r.rep)}</span><span>${r.points}</span></div>`;});
+    // 🥇🥈🥉 to the top three competing reps (non-rep answers get no medal)
+    const comp=rows.filter(r=>!NONREP.has(r.rep));
+    const medal={};comp.slice(0,3).forEach((r,i)=>medal[r.rep]=MEDAL[i]);
+    rows.slice(0,5).forEach(r=>{const non=NONREP.has(r.rep),md=medal[r.rep];
+      h+=`<div class="r${md===MEDAL[0]?' win':''}${non?' non':''}"><span>${md?md+' ':''}${esc(r.rep)}</span><span>${r.points}</span></div>`;});
     b.innerHTML=h;g.appendChild(b);});host.appendChild(g);
 }
 function hbars(id,items,key){key=key||"bottles";const host=document.getElementById(id);if(!host)return;
@@ -651,7 +669,7 @@ function dqPanel(id,d){const host=document.getElementById(id);if(!host||!d)retur
   const lead=!top?"—":(nobody?"Nobody":`${top.rep} (${top.points})`);
   const repsCount=(c.rows||[]).filter(r=>!NONREP.has(r.rep)).length;
   const cards=IS_PUBLIC?[
-    [c.label,"Current quarter",`${c.days_left} days left`],
+    [c.label,"Contest period",`${c.days_left} days left`],
     [lead,"Current leader",nobody?"no rep is leading":"unique doctors signed"],
     [repsCount,"Reps competing","this quarter"],
     [fmt(t.clinics),"Doctors reached","all-time, nationwide"],
@@ -667,6 +685,8 @@ function dqPanel(id,d){const host=document.getElementById(id);if(!host||!d)retur
 })();
 document.getElementById("cqlabel").textContent=DATA.current.label+" standings";
 document.getElementById("cqdays").textContent=DATA.current.days_left+" days left";
+{const ct=document.getElementById("cqtot"),ud=DATA.current.udocs;
+ if(ct)ct.textContent=fmt(ud)+" unique doctor"+(ud===1?"":"s")+" signed";}
 leaderboard(document.getElementById("leaderboard"),DATA.current);
 pastQ(document.getElementById("past"),DATA.past);
 
@@ -786,9 +806,10 @@ def page(data, records, mode, cipher=None):
 {banner}
 <div class="kpis" id="kpis"></div>
 <div class="card"><h2><span id="cqlabel"></span><span class="countdown" id="cqdays"></span></h2>
+<div class="qtot" id="cqtot"></div>
 <p class="note">Live competition. Top three win {' / '.join('$'+format(p,',') for p in PRIZES)}. Score = unique doctors signed.</p>
 <div id="leaderboard"></div></div>
-<div class="card"><h2>Past quarters</h2><p class="note">Final standings by quarter. 🏆 = winner. The doctor count is the total unique doctors signed that quarter across all contest participants, deduped, so it can run higher than the rep rows shown (those list only the current top reps). It includes requests where the doctor was unsure or came from another doctor, and excludes forms attributed to Krish and Aymeric.</p><div id="past"></div></div>
+<div class="card"><h2>Past contest periods</h2><p class="note">Final standings by period. 🥇🥈🥉 = top three. The doctor count is the total unique doctors signed that period across all contest participants, deduped, so it can run higher than the rep rows shown (those list only the current top reps). It includes requests where the doctor was unsure or came from another doctor, and excludes forms attributed to Krish and Aymeric.</p><div id="past"></div></div>
 {charts}
 {mgmt}
 {table}
