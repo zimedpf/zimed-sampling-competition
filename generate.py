@@ -400,6 +400,7 @@ CSS = r"""
  --body:'Inter',system-ui,-apple-system,"Segoe UI",sans-serif;
  --mono:'IBM Plex Mono',ui-monospace,"SF Mono",Menlo,monospace;}
 *{box-sizing:border-box}
+html,body{max-width:100%;overflow-x:hidden}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);
  font-feature-settings:"tnum" 1;-webkit-font-smoothing:antialiased;line-height:1.5}
 /* --- mono eyebrow with teardrop bullet: the signature label voice --- */
@@ -459,13 +460,13 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);
 .tip{position:relative;display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;margin-left:7px;
  border:1px solid var(--line);border-radius:50%;font-family:var(--body);font-weight:700;font-size:10px;font-style:italic;
  color:var(--teal-d);cursor:help;vertical-align:middle}
-.tipc{visibility:hidden;opacity:0;transition:opacity .15s ease;position:absolute;z-index:60;left:0;top:150%;
- width:min(330px,80vw);background:var(--abyss2);color:#EAF7F4;border:1px solid rgba(255,255,255,.12);border-radius:11px;
+.tipc{display:none;position:absolute;z-index:60;left:0;top:150%;
+ width:min(330px,86vw);background:var(--abyss2);color:#EAF7F4;border:1px solid rgba(255,255,255,.12);border-radius:11px;
  padding:13px 14px;font-family:var(--body);font-size:11.5px;font-weight:400;font-style:normal;line-height:1.6;
  letter-spacing:0;text-transform:none;text-align:left;box-shadow:0 18px 44px rgba(0,0,0,.4)}
 .tipc b{color:#fff}
-.tip:hover .tipc,.tip:focus .tipc{visibility:visible;opacity:1}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px 16px;margin-top:14px;
+.tip:hover .tipc,.tip:focus .tipc,.tip:focus-within .tipc{display:block}
+.card{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px 16px;margin-top:14px;
  box-shadow:0 1px 2px rgba(12,38,36,.03)}
 .card h2{margin:0 0 3px;font-family:var(--disp);font-size:16px;font-weight:700;letter-spacing:-.01em}
 .card .note{font-size:11.5px;color:var(--muted);margin:0 0 13px;line-height:1.55}
@@ -577,6 +578,23 @@ table.mini{font-size:12.5px}table.mini th{cursor:default}
  .kpis{grid-template-columns:repeat(2,1fr)}.kpi:nth-child(odd){border-left:0}
  .cols{grid-template-columns:1fr}.dqgrid{grid-template-columns:1fr}
  .projrow{grid-template-columns:84px 1fr 66px}.lrow{grid-template-columns:36px 1fr 1.2fr 64px;gap:9px}}
+/* phones: tighten padding, shrink fixed bar-label columns so nothing forces sideways scroll,
+   stack the table toolbar, and float the info tooltip as a fixed bottom card so it can't overflow */
+@media(max-width:560px){
+ .hero{padding:20px 16px 22px}.hero h1{font-size:18px}.hero .herobar{gap:11px}
+ .wrap{padding:16px 13px 48px}
+ .card{padding:15px 14px 13px}.card h2{font-size:15px}
+ .sec{font-size:10px}
+ .hbar{grid-template-columns:84px 1fr 48px;gap:8px;font-size:11.5px}
+ .hbar>div:first-child{overflow-wrap:anywhere;line-height:1.25}
+ .hbar.sales{grid-template-columns:38px 1fr 82px}
+ .hbar.cust{grid-template-columns:102px 1fr 60px}
+ .qpast{grid-template-columns:1fr}
+ .lrow{grid-template-columns:30px 1fr 1.1fr 52px;gap:7px}
+ .toolbar{flex-direction:column;align-items:stretch}
+ .toolbar input{min-width:0;width:100%}.toolbar select{width:100%}
+ .tip{position:static}
+ .tipc{position:fixed;left:50%;right:auto;top:auto;bottom:18px;transform:translateX(-50%);width:min(340px,92vw);z-index:200}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 """
 
@@ -916,7 +934,9 @@ def page(data, records, mode, cipher=None):
     banner = ('<div class="banner pub">Public standings. Aggregate competition results only — no patient or physician details. Score = unique doctors signed per rep.</div>'
               if is_public else
               '<div class="banner priv"><strong>Confidential — management view.</strong> Sample-consumption analytics plus physician contact detail. Keep private.</div>')
-    title = "Zimed Sampling Competition" + ("" if is_public else " — Management View")
+    title = "Zimed Sampling Competition" if is_public else "Zimed PF — Management Dashboard"
+    eyebrow_txt = ("Zimed PF sampling contest · live from JotForm" if is_public
+                   else "Zimed PF program · sampling, sales &amp; analytics · live")
     img = brand_img(is_public)
     img_tag = f'<img class="prod" src="{img}" alt="Zimed PF">' if img else ""
     sales_through = (data.get("sales") or {}).get("through", "") if has_sales else ""
@@ -1036,14 +1056,14 @@ def page(data, records, mode, cipher=None):
              '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
              '<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&'
              'family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">')
-    org = ("Management view" if not is_public else "Public board") + " · LUVO / Clarion"
+    org = ("Management dashboard" if not is_public else "Public board") + " · LUVO / Clarion"
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">{robots}
 <title>{title}</title>{fonts}<style>{CSS}</style></head><body>
 <header class="hero">
   <div class="herobar">{DROP_SVG}
     <div><h1>{title}</h1>
-      <div class="eyebrow" style="margin-top:7px;color:var(--muted-dk)"><span class="drip"></span>Zimed PF sampling contest · live from JotForm</div></div>
+      <div class="eyebrow" style="margin-top:7px;color:var(--muted-dk)"><span class="drip"></span>{eyebrow_txt}</div></div>
     <div class="org">{org}<br>Auto-refreshed ~20 min</div>{img_tag}</div>
   <div class="marquee">
     <div class="mq live"><div class="lab">Contest period</div><div class="big" id="heroPeriod">—</div><div class="sub" id="heroPeriodSub"></div></div>
