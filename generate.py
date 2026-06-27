@@ -169,23 +169,30 @@ def quarter_end(y, q): return datetime.date(y, *{1:(3,31),2:(6,30),3:(9,30),4:(1
 
 def build_competition(records, today, current_reps):
     buckets = {}
+    qdocs = {}  # quarter -> set of unique doctors across ALL contest participants
     for r in records:
-        # Only count reps who are excluded-free AND still a valid current dropdown option.
+        # Quarter-level unique-doctor total: every participant except Krish/Aymeric/blank
+        # (blanks are remapped to Krish). Includes "Unsure"/"Another doctor" and departed reps.
+        if r["rep"] not in EXCLUDE:
+            qdocs.setdefault((r["year"], r["q"]), set()).add(r["dkey"])
+        # Per-rep scoring: excluded-free AND still a valid current dropdown option.
         if r["rep"] in EXCLUDE or r["rep"] not in current_reps: continue
         buckets.setdefault((r["year"], r["q"]), {}).setdefault(r["rep"], set()).add(r["dkey"])
     def rows(key):
         reps = buckets.get(key, {})
         return [{"rep": rep, "points": n} for rep, n in
                 sorted(((rep, len(ds)) for rep, ds in reps.items()), key=lambda x: -x[1])]
+    udocs = lambda key: len(qdocs.get(key, ()))
     cy, cq = today.year, (today.month-1)//3+1
     days_left = (quarter_end(cy, cq) - today).days
     current = {"label": qlabel(cy, cq), "days_left": max(0, days_left),
-               "prizes": PRIZES, "rows": rows((str(cy), cq))}
+               "prizes": PRIZES, "rows": rows((str(cy), cq)), "udocs": udocs((str(cy), cq))}
     past = []
     for (y, q) in sorted(buckets, reverse=True):
         if (int(y), q) == (cy, cq): continue
         rr = rows((y, q))
-        past.append({"label": qlabel(y, q), "rows": rr, "winner": rr[0]["rep"] if rr else None})
+        past.append({"label": qlabel(y, q), "rows": rr, "winner": rr[0]["rep"] if rr else None,
+                     "udocs": udocs((y, q))})
     return current, past
 
 def build_consumption(records, today, current_reps):
@@ -403,7 +410,8 @@ header svg{width:34px;height:34px;flex:none}
 .lrow .rank .rbadge.dash{background:none;color:#9fb0ae}
 .lrow .gap{font-size:10.5px;color:var(--muted)}.medal{font-size:16px}
 .qpast{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
-.qbox{border:1px solid var(--line);border-radius:11px;padding:12px 14px}.qbox h3{margin:0 0 8px;font-size:13px}
+.qbox{border:1px solid var(--line);border-radius:11px;padding:12px 14px}.qbox h3{margin:0 0 2px;font-size:13px}
+.qbox .qtot{font-size:11px;font-weight:700;color:var(--teal-d);margin:0 0 8px}
 .qbox .r{display:flex;justify-content:space-between;font-size:12.5px;padding:2px 0}.qbox .r.win{font-weight:800;color:var(--teal-d)}.qbox .r.non{opacity:.55;font-style:italic}
 .card svg{width:100%;height:auto;display:block;overflow:visible}
 .gridline{stroke:#eef3f2}.tick{fill:var(--muted);font-size:10.5px}.vlab{fill:var(--ink);font-size:10.5px;font-weight:700}
@@ -528,7 +536,8 @@ function leaderboard(host,q){
 }
 function pastQ(host,past){
   host.innerHTML="";if(!past.length)return;const g=document.createElement("div");g.className="qpast";
-  past.forEach(q=>{const b=document.createElement("div");b.className="qbox";let h=`<h3>${esc(q.label)}</h3>`;
+  past.forEach(q=>{const b=document.createElement("div");b.className="qbox";
+    let h=`<h3>${esc(q.label)}</h3><div class="qtot">${fmt(q.udocs)} unique doctor${q.udocs===1?'':'s'} signed</div>`;
     const rows=q.rows||[];
     const repPts=rows.filter(r=>!NONREP.has(r.rep)).map(r=>r.points);
     const top=repPts.length?Math.max(...repPts):null;   // winner = top real rep(s)
@@ -779,7 +788,7 @@ def page(data, records, mode, cipher=None):
 <div class="card"><h2><span id="cqlabel"></span><span class="countdown" id="cqdays"></span></h2>
 <p class="note">Live competition. Top three win {' / '.join('$'+format(p,',') for p in PRIZES)}. Score = unique doctors signed.</p>
 <div id="leaderboard"></div></div>
-<div class="card"><h2>Past quarters</h2><p class="note">Final standings by quarter. 🏆 = winner.</p><div id="past"></div></div>
+<div class="card"><h2>Past quarters</h2><p class="note">Final standings by quarter. 🏆 = winner. The doctor count is the total unique doctors signed that quarter across all contest participants, deduped, so it can run higher than the rep rows shown (those list only the current top reps). It includes requests where the doctor was unsure or came from another doctor, and excludes forms attributed to Krish and Aymeric.</p><div id="past"></div></div>
 {charts}
 {mgmt}
 {table}
