@@ -491,6 +491,11 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);
 .hbar .t{background:var(--line2);border-radius:6px;height:17px;overflow:hidden}
 .hbar .f{height:100%;background:linear-gradient(90deg,var(--teal-d),var(--teal));border-radius:6px}
 .hbar .v{text-align:right;font-family:var(--disp);font-weight:700;font-variant-numeric:tabular-nums}
+.hbar .f.gold{background:linear-gradient(90deg,var(--gold-d),var(--gold))}
+.hbar.sales{grid-template-columns:58px 1fr 116px}
+.hbar.sales .v .vu{display:block;font-family:var(--mono);font-size:9px;font-weight:500;color:var(--muted)}
+.hbar.cust{grid-template-columns:164px 1fr 78px}
+.hbar.cust>div:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 table{width:100%;border-collapse:collapse;font-size:12.5px}
 th,td{text-align:left;padding:8px 9px;border-bottom:1px solid var(--line2);vertical-align:top}
 th{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--teal-d);
@@ -731,6 +736,57 @@ function dqPanel(id,d){const host=document.getElementById(id);if(!host||!d)retur
     ["Missing province",d.no_province,d.no_province?"can’t be placed on a territory":"all resolved via postal code",d.no_province>0],
     ["Missing licence #",d.no_license,"dedupe falls back to name",d.no_license>0]];
   host.innerHTML='<div class="dqgrid">'+items.map(it=>`<div class="dqcard${it[3]?' warn':' ok'}"><div class="n">${fmt(it[1])}</div><div class="l">${esc(it[0])}</div><div class="s">${esc(it[2])}</div></div>`).join("")+`</div><p class="note">Of ${fmt(d.total)} submissions all-time.</p>`;}
+// ---- Zimed SALES renderers (management-only; DATA.sales only exists in the encrypted/private payload) ----
+const money=n=>"$"+fmt(Math.round(+n));
+function salesProvince(id,items){const host=document.getElementById(id);if(!host)return;
+  if(!items||!items.length){host.innerHTML='<p class="note">No sales data.</p>';return;}
+  const max=Math.max(1,...items.map(i=>i.revenue));host.innerHTML="";
+  const w=document.createElement("div");w.className="hbars";
+  items.forEach(it=>{const row=document.createElement("div");row.className="hbar sales";
+    row.innerHTML=`<div title="${esc(it.k)}">${esc(it.k)}</div><div class="t"><div class="f gold" style="width:${Math.max(3,it.revenue/max*100)}%"></div></div><div class="v">${money(it.revenue)}<span class="vu">${fmt(it.units)} bottles</span></div>`;
+    w.appendChild(row);});host.appendChild(w);}
+function salesCustomers(id,items){const host=document.getElementById(id);if(!host)return;
+  if(!items||!items.length){host.innerHTML='<p class="note">No sales data.</p>';return;}
+  const max=Math.max(1,...items.map(i=>i.revenue));host.innerHTML="";
+  const w=document.createElement("div");w.className="hbars";
+  items.forEach(it=>{const row=document.createElement("div");row.className="hbar cust";
+    row.innerHTML=`<div title="${esc(it.k)}">${esc(it.k)}</div><div class="t"><div class="f gold" style="width:${Math.max(3,it.revenue/max*100)}%"></div></div><div class="v">${money(it.revenue)}</div>`;
+    w.appendChild(row);});host.appendChild(w);}
+function buildSalesCombo(items){
+  const W=520,H=220,pL=40,pR=46,pT=18,pB=28,u=items.map(i=>i.units),rev=items.map(i=>i.revenue);
+  const umax=Math.max(1,...u),rmax=Math.max(1,...rev),pw=W-pL-pR,ph=H-pT-pB;
+  const s=el("svg",{viewBox:`0 0 ${W} ${H}`});if(!items.length)return EMPTY(s,W,H);
+  for(let g=0;g<=4;g++){const yv=Math.round(umax*g/4),y=pT+ph-(yv/umax)*ph;
+    s.appendChild(el("line",{x1:pL,y1:y,x2:W-pR,y2:y,class:"gridline"}));
+    s.appendChild(el("text",{x:pL-6,y:y+4,"text-anchor":"end",class:"tick"},kfmt(yv)));
+    s.appendChild(el("text",{x:W-pR+6,y:y+4,class:"tick",fill:"#B07C0A"},kfmt(Math.round(rmax*g/4))));}
+  const step=pw/items.length,bw=Math.min(32,step*0.5),lstep=Math.ceil(items.length/12);
+  items.forEach((it,i)=>{const x=pL+i*step+step/2,h=(it.units/umax)*ph,y=pT+ph-h;
+    const rc=el("rect",{x:x-bw/2,y:y,width:bw,height:h,rx:3,fill:"#03BAB3"});
+    rc.appendChild(el("title",null,`${it.label}: ${fmt(it.units)} bottles · ${money(it.revenue)}`));s.appendChild(rc);
+    if(i%lstep===0||i===items.length-1)s.appendChild(el("text",{x:x,y:H-9,"text-anchor":"middle",class:"tick"},it.label));});
+  const pts=rev.map((v,i)=>[pL+i*step+step/2,pT+ph-(v/rmax)*ph]);
+  if(pts.length>1){let dp="";pts.forEach((p,i)=>dp+=(i?"L":"M")+p[0]+" "+p[1]+" ");
+    s.appendChild(el("path",{d:dp,fill:"none",stroke:"#FAB718","stroke-width":2.5}));}
+  pts.forEach(p=>s.appendChild(el("circle",{cx:p[0],cy:p[1],r:3,fill:"#fff",stroke:"#FAB718","stroke-width":2})));
+  return s;}
+function salesMonth(id,items){const host=document.getElementById(id);if(!host)return;
+  windowed(host,items,(box,data)=>box.appendChild(buildSalesCombo(data)));}
+function samplesVsSales(id,samples,sales){const host=document.getElementById(id);if(!host)return;
+  const sM={},vM={};(samples||[]).forEach(p=>sM[p.k]=p.bottles);(sales||[]).forEach(p=>vM[p.k]=p.units);
+  const provs=[...new Set([...Object.keys(vM),...Object.keys(sM)])].filter(k=>k&&k!=="—").sort((a,b)=>(vM[b]||0)-(vM[a]||0));
+  if(!provs.length){host.innerHTML='<p class="note">No data.</p>';return;}
+  const W=520,H=224,pL=40,pR=12,pT=16,pB=28,max=Math.max(1,...provs.map(p=>Math.max(sM[p]||0,vM[p]||0)));
+  const pw=W-pL-pR,ph=H-pT-pB;const s=el("svg",{viewBox:`0 0 ${W} ${H}`});host.innerHTML="";
+  for(let g=0;g<=4;g++){const yv=Math.round(max*g/4),y=pT+ph-(yv/max)*ph;
+    s.appendChild(el("line",{x1:pL,y1:y,x2:W-pR,y2:y,class:"gridline"}));
+    s.appendChild(el("text",{x:pL-6,y:y+4,"text-anchor":"end",class:"tick"},kfmt(yv)));}
+  const step=pw/provs.length,bw=Math.min(15,step*0.32);
+  provs.forEach((p,i)=>{const cx=pL+i*step+step/2,sb=sM[p]||0,vb=vM[p]||0,h1=(sb/max)*ph,h2=(vb/max)*ph;
+    const r1=el("rect",{x:cx-bw-1,y:pT+ph-h1,width:bw,height:h1,rx:2,fill:"#03BAB3"});r1.appendChild(el("title",null,`${p} sampled: ${fmt(sb)} bottles`));s.appendChild(r1);
+    const r2=el("rect",{x:cx+1,y:pT+ph-h2,width:bw,height:h2,rx:2,fill:"#FAB718"});r2.appendChild(el("title",null,`${p} sold: ${fmt(vb)} bottles`));s.appendChild(r2);
+    s.appendChild(el("text",{x:cx,y:H-9,"text-anchor":"middle",class:"tick"},p));});
+  host.appendChild(s);}
 
 (function(){
   const k=DATA.consumption.kpis,t=DATA.team,c=DATA.current;
@@ -785,7 +841,23 @@ pastQ(document.getElementById("past"),DATA.past);
   dqPanel("dataquality",c.dq);
   const rrEl=document.getElementById("runrate");
   if(rrEl){const rr=c.run,pct=rr.total?Math.round(rr.elapsed/rr.total*100):0;
-    rrEl.innerHTML=`<div class="n">${fmt(rr.projected)}</div><div class="l">Projected bottles, ${esc(rr.label)}</div><div class="s">${fmt(rr.so_far)} so far · ${pct}% of quarter elapsed</div>`;}
+    rrEl.innerHTML=`<div class="n">${fmt(rr.projected)}</div><div class="l">Projected bottles, ${esc(rr.label)}</div><div class="s">${fmt(rr.so_far)} so far · ${pct}% of period elapsed</div>`;}
+  // Zimed sales (only present in the encrypted/private payload)
+  if(DATA.sales){const sl=DATA.sales,t=sl.totals,tp=(sl.by_province||[])[0],sampled=(DATA.team&&DATA.team.bottles)||0;
+    salesProvince("salesProvince",sl.by_province);
+    salesMonth("salesMonth",sl.by_month);
+    salesCustomers("salesCustomers",sl.by_customer);
+    samplesVsSales("samplesVsSales",DATA.consumption.by_province,sl.by_province);
+    const ratio=sampled?(t.units/sampled):0;
+    const sk=[
+      [money(t.revenue),"Net revenue",`through ${esc(sl.through)}`],
+      [fmt(t.units),"Bottles sold",`${t.orders} invoices · ${t.returns} returns`],
+      ["$"+(t.units?Math.round(t.revenue/t.units):0),"Avg $ / bottle","blended"],
+      [tp?tp.k:"—","Top province",tp?money(tp.revenue):""],
+      [ratio?ratio.toFixed(1)+"×":"—","Sold vs sampled","bottles sold ÷ sampled"],
+    ];
+    const ske=document.getElementById("salesKpis");
+    if(ske)ske.innerHTML=sk.map(x=>`<div class="kpi"><div class="n">${esc(x[0])}</div><div class="l">${esc(x[1])}</div><div class="s">${esc(x[2])}</div></div>`).join("");}
 }
 if(typeof RECORDS!=="undefined"){
     const H=[["date","Date"],["clinic","Clinic"],["doctor","Doctor"],["province","Prov"],["phone","Phone"],["address","Address"],["samples","Bottles"],["license","Licence"],["rep","Referrer"]];
@@ -804,6 +876,7 @@ document.getElementById("stamp").textContent=DATA.stamp;
 
 def page(data, records, mode, cipher=None):
     is_public = (mode == "public")
+    has_sales = (not is_public) and bool(data and data.get("sales"))
     banner = ('<div class="banner pub">Public standings. Aggregate competition results only — no patient or physician details. Score = unique doctors signed per rep.</div>'
               if is_public else
               '<div class="banner priv"><strong>Confidential — management view.</strong> Sample-consumption analytics plus physician contact detail. Keep private.</div>')
@@ -851,6 +924,17 @@ def page(data, records, mode, cipher=None):
       <div class="card"><h2>Rep efficiency</h2><p class="note">Doctors reached and average order size per competing rep.</p><div id="efficiency"></div></div>
       <div class="card"><h2>Data-quality flags</h2><p class="note">Submissions missing fields that weaken attribution or geography.</p><div id="dataquality"></div></div>
     </div>"""
+    sales_through = (data.get("sales") or {}).get("through", "") if has_sales else ""
+    salessec = "" if not has_sales else f"""
+    <div class="sec">Zimed sales <span class="mgmttag">confidential</span></div>
+    <div class="card" style="background:linear-gradient(180deg,#FBFDFC,#fff)"><p class="note" style="margin:0">Actual Zimed unit sales and revenue from Clarion Finance (wholesaler invoices), through <strong>{sales_through}</strong>. Confidential — this data lives only inside this encrypted page, never on the public board.</p></div>
+    <div class="kpis" id="salesKpis"></div>
+    <div class="cols">
+      <div class="card"><h2>Sales by province</h2><p class="note">Net revenue and bottles sold per province (wholesaler ship-to location).</p><div id="salesProvince"></div></div>
+      <div class="card"><h2>Sales by month</h2><p class="note"><span class="pill">teal bars = bottles</span> &nbsp;<span class="pill" style="background:#FCF3DC;color:#9a6b00">gold line = revenue $</span></p><div id="salesMonth"></div></div>
+    </div>
+    <div class="card"><h2>Top wholesalers</h2><p class="note">Distributors buying Zimed, by net revenue (all-time).</p><div id="salesCustomers"></div></div>
+    <div class="card"><h2>Samples vs sales by province</h2><p class="note"><span class="pill">teal = sampled</span> &nbsp;<span class="pill" style="background:#FCF3DC;color:#9a6b00">gold = sold</span> &nbsp; Bottles sampled into clinics vs paid bottles sold. Directional — sample province is the clinic, sales province is the wholesaler depot.</p><div id="samplesVsSales"></div></div>"""
     table = "" if is_public else """
     <div class="sec">Full data</div>
     <div class="card"><h2>All submissions</h2><p class="note">Click a header to sort; type to filter.</p>
@@ -898,6 +982,7 @@ def page(data, records, mode, cipher=None):
 <div class="card"><h2>Past contest periods</h2><p class="note">Final standings by period. 🥇🥈🥉 = top three. The doctor count is the total unique doctors signed that period across all contest participants, deduped, so it can run higher than the rep rows shown (those list only the current top reps). It includes requests where the doctor was unsure or came from another doctor, and excludes forms attributed to Krish and Aymeric.</p><div id="past"></div></div>
 {charts}
 {mgmt}
+{salessec}
 {table}
 <div class="foot">{foot}</div></div>
 <script>{script}</script></body></html>"""
@@ -954,37 +1039,64 @@ def encrypt_payload(passphrase, obj):
 def pii_guard(html, records):
     return [v for r in records for f in ("email", "phone") if (v := r.get(f)) and v in html]
 
+def load_sales():
+    """Confidential Zimed sales aggregates. From the SALES_DATA env (the Actions secret) in the
+    cloud, or local sales_data.json for local builds. Returns None if absent/unparseable."""
+    raw = (os.environ.get("SALES_DATA") or "").strip()
+    if not raw:
+        p = os.path.join(SELF, "sales_data.json")
+        if os.path.exists(p): raw = open(p, encoding="utf-8").read()
+    if not raw: return None
+    try:
+        s = json.loads(raw)
+        return s if s.get("by_province") else None
+    except Exception as e:
+        print(f"WARN: SALES_DATA present but unparseable ({e}); sales charts skipped.", file=sys.stderr)
+        return None
+
+def sales_guard(html, sales):
+    """Defence-in-depth: confirm no sales figures landed in a PUBLIC build."""
+    if not sales: return []
+    needles = [str(sales.get("totals", {}).get("revenue", "x"))]
+    needles += [c.get("k", "") for c in sales.get("by_customer", [])[:3]]
+    return [n for n in needles if n and n in html]
+
 def main():
     args = set(sys.argv[1:])
     out_dir = sys.argv[sys.argv.index("--out")+1] if "--out" in sys.argv else "."
     records = fetch_records()
     data = build(records)
+    sales = load_sales()
+    # management payload carries sales; the public payload NEVER does.
+    mdata = {**data, "sales": sales} if sales else data
 
     if "--encrypted" in args:
         pw = (os.environ.get("MGMT_PASSPHRASE") or "").strip()
         if not pw: sys.exit("MGMT_PASSPHRASE env not set; refusing to build management page.")
-        cipher = encrypt_payload(pw, {"DATA": data, "RECORDS": records})
-        html = page(data, records, "encrypted", cipher)
+        cipher = encrypt_payload(pw, {"DATA": mdata, "RECORDS": records})
+        html = page(mdata, records, "encrypted", cipher)
         leak = pii_guard(html, records)
         if leak: sys.exit(f"ABORT: {len(leak)} PII values leaked into the encrypted file (should be impossible).")
         os.makedirs(out_dir, exist_ok=True)
         open(os.path.join(out_dir, "index.html"), "w").write(html)
-        print(f"records={len(records)} -> {out_dir}/index.html (ENCRYPTED management view, no plaintext PII)")
+        print(f"records={len(records)} sales={'yes' if sales else 'no'} -> {out_dir}/index.html (ENCRYPTED management view)")
         return
 
-    pub = page(data, None, "public")
+    pub = page(data, None, "public")   # plain `data` — sales can never reach the public build
     leak = pii_guard(pub, records)
     if leak: sys.exit(f"ABORT: {len(leak)} PII values would leak into public file.")
+    sleak = sales_guard(pub, sales)
+    if sleak: sys.exit(f"ABORT: confidential sales data leaked into public file: {sleak}")
     if "--public-only" in args:
         os.makedirs(out_dir, exist_ok=True)
         open(os.path.join(out_dir, "index.html"), "w").write(pub)
-        print(f"records={len(records)} reached={data['team']['clinics']} bottles={data['team']['bottles']} PII=OK -> {out_dir}/index.html")
+        print(f"records={len(records)} reached={data['team']['clinics']} bottles={data['team']['bottles']} PII=OK SALES=excluded -> {out_dir}/index.html")
     else:
         os.makedirs(os.path.join(OUT, "public"), exist_ok=True)
         os.makedirs(os.path.join(OUT, "private"), exist_ok=True)
         open(os.path.join(OUT, "public", "index.html"), "w").write(pub)
-        open(os.path.join(OUT, "private", "index.html"), "w").write(page(data, records, "private"))
-        print(f"records={len(records)} reached={data['team']['clinics']} bottles={data['team']['bottles']} PII=OK -> out/public + out/private")
+        open(os.path.join(OUT, "private", "index.html"), "w").write(page(mdata, records, "private"))
+        print(f"records={len(records)} reached={data['team']['clinics']} bottles={data['team']['bottles']} sales={'yes' if sales else 'no'} -> out/public + out/private")
 
 if __name__ == "__main__":
     main()
