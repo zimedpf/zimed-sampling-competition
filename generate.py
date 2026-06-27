@@ -446,6 +446,14 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);
 .kpi .n{font-family:var(--disp);font-size:25px;font-weight:800;line-height:1;letter-spacing:-.01em}
 .kpi .l{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal-d);margin-top:9px}
 .kpi .s{font-size:11px;color:var(--muted);margin-top:4px}
+.rr{padding:2px 0 1px}
+.rrhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.rrn{font-family:var(--disp);font-size:30px;font-weight:800;line-height:1;letter-spacing:-.01em}
+.rru{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--teal-d)}
+.rrtrack{background:var(--line2);border-radius:8px;height:22px;overflow:hidden;margin:15px 0 9px}
+.rrfill{height:100%;background:linear-gradient(90deg,var(--teal-d),var(--teal));border-radius:8px;transition:width .9s cubic-bezier(.2,.8,.2,1)}
+.rrleg{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:12px;color:var(--muted)}
+.rrleg b{color:var(--ink);font-size:13px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px 16px;margin-top:14px;
  box-shadow:0 1px 2px rgba(12,38,36,.03)}
 .card h2{margin:0 0 3px;font-family:var(--disp);font-size:16px;font-weight:700;letter-spacing:-.01em}
@@ -736,6 +744,15 @@ function dqPanel(id,d){const host=document.getElementById(id);if(!host||!d)retur
     ["Missing province",d.no_province,d.no_province?"can’t be placed on a territory":"all resolved via postal code",d.no_province>0],
     ["Missing licence #",d.no_license,"dedupe falls back to name",d.no_license>0]];
   host.innerHTML='<div class="dqgrid">'+items.map(it=>`<div class="dqcard${it[3]?' warn':' ok'}"><div class="n">${fmt(it[1])}</div><div class="l">${esc(it[0])}</div><div class="s">${esc(it[2])}</div></div>`).join("")+`</div><p class="note">Of ${fmt(d.total)} submissions all-time.</p>`;}
+function runrate(id,rr){const host=document.getElementById(id);if(!host||!rr)return;
+  const proj=rr.projected||0, so=rr.so_far||0;
+  const pct=rr.total?Math.round(rr.elapsed/rr.total*100):0;        // share of the period elapsed
+  const fill=proj?Math.max(2,Math.min(100,Math.round(so/proj*100))):0;  // bottles so far as a share of the projected total
+  host.innerHTML='<div class="rr">'
+    +`<div class="rrhead"><span class="rrn">${fmt(proj)}</span><span class="rru">projected sample bottles · ${esc(rr.label)}</span></div>`
+    +`<div class="rrtrack"><div class="rrfill" style="width:${fill}%"></div></div>`
+    +`<div class="rrleg"><span><b>${fmt(so)}</b> delivered so far</span><span class="pmut">${pct}% of period elapsed · ${fmt(rr.elapsed)}/${fmt(rr.total)} days</span></div>`
+    +'</div>';}
 // ---- Zimed SALES renderers (management-only; DATA.sales only exists in the encrypted/private payload) ----
 const money=n=>"$"+fmt(Math.round(+n));
 function salesProvince(id,items){const host=document.getElementById(id);if(!host)return;
@@ -839,9 +856,7 @@ pastQ(document.getElementById("past"),DATA.past);
   lapsedPanel("lapsed",c.lapsed);
   effTable("efficiency",c.efficiency);
   dqPanel("dataquality",c.dq);
-  const rrEl=document.getElementById("runrate");
-  if(rrEl){const rr=c.run,pct=rr.total?Math.round(rr.elapsed/rr.total*100):0;
-    rrEl.innerHTML=`<div class="n">${fmt(rr.projected)}</div><div class="l">Projected bottles, ${esc(rr.label)}</div><div class="s">${fmt(rr.so_far)} so far · ${pct}% of period elapsed</div>`;}
+  runrate("runrate",c.run);
   // Zimed sales (only present in the encrypted/private payload)
   if(DATA.sales){const sl=DATA.sales,t=sl.totals,tp=(sl.by_province||[])[0],sampled=(DATA.team&&DATA.team.bottles)||0;
     salesProvince("salesProvince",sl.by_province);
@@ -919,7 +934,7 @@ def page(data, records, mode, cipher=None):
     C_BYPROVINCE = '<div class="card"><h2>Sample bottles by province</h2><p class="note">Where the free samples are landing (clinic location).</p><div id="byProvince"></div></div>'
     C_BYREGION   = '<div class="card"><h2>Sample bottles by territory</h2><p class="note">Provinces rolled up West / Central / Atlantic.</p><div id="byRegion"></div></div>'
     # Contest outlook + attribution
-    C_RUNRATE    = '<div class="card"><h2>Current-period run-rate</h2><p class="note">Projected sample bottle volume for the period if the current pace holds.</p><div class="kpi" id="runrate" style="margin-top:8px;border:1px solid var(--line);border-radius:11px"></div></div>'
+    C_RUNRATE    = '<div class="card"><h2>Current-period run-rate</h2><p class="note">Projected sample bottle volume for the period if the current pace holds.</p><div id="runrate"></div></div>'
     C_PROJECTION = '<div class="card"><h2>On pace to win</h2><p class="note">Unique doctors so far <span class="pmut">→ projected at the current rate</span> for each competing rep.</p><div id="projection"></div></div>'
     C_BYREP      = '<div class="card"><h2>Sample bottles by referrer</h2><p class="note">Total sample volume credited to each name (everyone, incl. non-competitors).</p><div id="byRep"></div></div>'
     # Management-only: contest momentum + operations
