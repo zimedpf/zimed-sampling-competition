@@ -29,11 +29,16 @@ header svg{width:34px;height:34px;flex:none}
 .lrow.top{background:#f3fbfa}.lrow .rank{font-weight:800;text-align:center}.lrow .who{font-weight:600}
 .lrow .barwrap{background:#eef3f2;border-radius:6px;height:18px;overflow:hidden}.lrow .bar{height:100%;background:var(--teal)}
 .lrow .pts{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}.lrow .prize{font-size:11px;color:#9a6b00;font-weight:700}
-.lrow .prize.tie{color:#c0392b;font-size:10px;text-transform:uppercase;letter-spacing:.3px}
+.lrow .prize.tie{color:#c0392b;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.3px}
+.lrow .rank .rbadge{display:inline-block;min-width:26px;text-align:center;font-weight:800;font-size:12.5px;color:#5a716e;background:#eef3f2;border-radius:7px;padding:3px 0}
+.lrow .rank .rbadge.t{color:#b9531f;background:#fdeee2}
+.lrow .stake{font-size:9.5px;color:#9a6b00;font-weight:600;margin-top:1px}
+.lrow.non{opacity:.62}.lrow.non .who{font-style:italic;font-weight:500}
+.lrow .rank .rbadge.dash{background:none;color:#9fb0ae}
 .lrow .gap{font-size:10.5px;color:var(--muted)}.medal{font-size:16px}
 .qpast{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
 .qbox{border:1px solid var(--line);border-radius:11px;padding:12px 14px}.qbox h3{margin:0 0 8px;font-size:13px}
-.qbox .r{display:flex;justify-content:space-between;font-size:12.5px;padding:2px 0}.qbox .r.win{font-weight:800;color:var(--teal-d)}
+.qbox .r{display:flex;justify-content:space-between;font-size:12.5px;padding:2px 0}.qbox .r.win{font-weight:800;color:var(--teal-d)}.qbox .r.non{opacity:.55;font-style:italic}
 .card svg{width:100%;height:auto;display:block;overflow:visible}
 .gridline{stroke:#eef3f2}.tick{fill:var(--muted);font-size:10.5px}.vlab{fill:var(--ink);font-size:10.5px;font-weight:700}
 .hbars{display:flex;flex-direction:column;gap:6px}
@@ -87,12 +92,14 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}.tin{max-height:520px;
       <div class="card"><h2>Current-quarter run-rate</h2><p class="note">Projection if the current pace holds.</p><div class="kpi" id="runrate" style="margin-top:8px"></div></div>
       <div class="card"><h2>&nbsp;</h2><p class="note">&nbsp;</p></div>
     </div>
+
     <div class="sec">Full data</div>
     <div class="card"><h2>All submissions</h2><p class="note">Click a header to sort; type to filter.</p>
       <div class="toolbar"><input id="search" placeholder="Search clinic, doctor, address, referrer…"><select id="repf"></select><span class="note" id="rc"></span></div>
       <div class="tin"><table><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table></div></div>
 <div class="foot">Source: live JotForm “Zimed PF Sample Request Form”. Competition score = unique doctors who signed and named each rep (a doctor signing again does not add a point); Krish and Aymeric are excluded from standings. Zimed PF (bimatoprost 0.03%) is a <span class="luvo">LUVO</span> brand distributed by Clarion Medical. Auto-refreshed about every 20 minutes · <span id="stamp"></span>.</div></div>
-<script>function renderAll(){
+<script>const NONREP=new Set(["Unsure", "Another doctor"]);
+function renderAll(){
 
 const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const NS="http://www.w3.org/2000/svg";
@@ -100,23 +107,41 @@ function el(t,a,x){const e=document.createElementNS(NS,t);for(const k in a)e.set
 const MEDAL=["🥇","🥈","🥉"];
 const fmt=n=>(+n).toLocaleString();
 
+function ordinal(n){const v=n%100,s=["th","st","nd","rd"];return n+(s[(v-20)%10]||s[v]||s[0]);}
 function leaderboard(host,q){
-  const rows=q.rows||[],max=Math.max(1,...rows.map(r=>r.points));
+  const rows=q.rows||[];
   if(!rows.length){host.innerHTML='<p class="note">No qualifying signatures yet this quarter — wide open.</p>';return;}
-  host.innerHTML="";const lb=document.createElement("div");lb.className="lb";
+  const prizes=q.prizes||[], maxPts=rows[0].points, leaderPts=rows[0].points;
+  // rank with ties: everyone sharing a point value shares a rank
   const cnt={};rows.forEach(r=>cnt[r.points]=(cnt[r.points]||0)+1);
-  rows.forEach((r,i)=>{
-    let prizeHtml="";
-    if(q.prizes&&q.prizes[i]!=null){
-      prizeHtml = cnt[r.points]>1
-        ? '<div class="prize tie">tiebreaker needed!</div>'
-        : '<div class="prize">$'+fmt(q.prizes[i])+'</div>';
+  host.innerHTML="";const lb=document.createElement("div");lb.className="lb";
+  rows.forEach(r=>{
+    const rank=1+rows.filter(x=>x.points>r.points).length;
+    const size=cnt[r.points], tied=size>1, isRep=!NONREP.has(r.rep);
+    let rankCell, sub, prizeHtml="";
+    if(!isRep){
+      // catch-all answer: visible in standings, but outside the ranking (no rank/medal/prize)
+      rankCell='<span class="rbadge dash">–</span>';
+      sub='form answer · not a competing rep';
+    }else{
+      // medal ONLY for a clean (uncontested) podium place; tied places get a "T#" badge
+      if(!tied && rank<=3) rankCell='<span class="medal">'+MEDAL[rank-1]+'</span>';
+      else rankCell='<span class="rbadge'+(tied?' t':'')+'">'+(tied?'T'+rank:rank)+'</span>';
+      if(rank===1 && !tied) sub='leader';
+      else if(tied) sub='tied for '+ordinal(rank);
+      else sub=(leaderPts-r.points)+' behind the lead';
+      if(!tied){
+        if(rank<=prizes.length) prizeHtml='<div class="prize">$'+fmt(prizes[rank-1])+'</div>';
+      }else{
+        // tiebreaker shown identically for every member of the tied group
+        const stake=[];for(let p=rank;p<=rank+size-1;p++) if(p<=prizes.length) stake.push(prizes[p-1]);
+        if(stake.length) prizeHtml='<div class="prize tie">tiebreaker needed!</div><div class="stake">for '+stake.map(p=>'$'+fmt(p)).join(' / ')+'</div>';
+      }
     }
-    const gap=i===0?"leader":(rows[i-1].points-r.points===0?"tied":`-${rows[i-1].points-r.points} to ${MEDAL[i-1]||"#"+i}`);
-    const d=document.createElement("div");d.className="lrow"+(i<3?" top":"");
-    d.innerHTML=`<div class="rank">${i<3?'<span class="medal">'+MEDAL[i]+'</span>':(i+1)}</div>
-      <div><div class="who">${esc(r.rep)}</div><div class="gap">${gap}</div></div>
-      <div class="barwrap"><div class="bar" style="width:${Math.max(4,r.points/max*100)}%"></div></div>
+    const d=document.createElement("div");d.className="lrow"+(isRep&&!tied&&rank<=3?" top":"")+(isRep?"":" non");
+    d.innerHTML=`<div class="rank">${rankCell}</div>
+      <div><div class="who">${esc(r.rep)}</div><div class="gap">${sub}</div></div>
+      <div class="barwrap"><div class="bar" style="width:${Math.max(4,r.points/Math.max(1,maxPts)*100)}%"></div></div>
       <div class="pts">${r.points}${prizeHtml}</div>`;
     lb.appendChild(d);
   });
@@ -125,7 +150,11 @@ function leaderboard(host,q){
 function pastQ(host,past){
   host.innerHTML="";if(!past.length)return;const g=document.createElement("div");g.className="qpast";
   past.forEach(q=>{const b=document.createElement("div");b.className="qbox";let h=`<h3>${esc(q.label)}</h3>`;
-    (q.rows||[]).slice(0,5).forEach((r,i)=>h+=`<div class="r${i===0?' win':''}"><span>${i===0?'🏆 ':''}${esc(r.rep)}</span><span>${r.points}</span></div>`);
+    const rows=q.rows||[];
+    const repPts=rows.filter(r=>!NONREP.has(r.rep)).map(r=>r.points);
+    const top=repPts.length?Math.max(...repPts):null;   // winner = top real rep(s)
+    rows.slice(0,5).forEach(r=>{const non=NONREP.has(r.rep),win=!non&&r.points===top;
+      h+=`<div class="r${win?' win':''}${non?' non':''}"><span>${win?'🏆 ':''}${esc(r.rep)}</span><span>${r.points}</span></div>`;});
     b.innerHTML=h;g.appendChild(b);});host.appendChild(g);
 }
 function hbars(id,items,key){key=key||"bottles";const host=document.getElementById(id);if(!host)return;
@@ -168,11 +197,14 @@ function stacked(id,items){const host=document.getElementById(id);if(!host)retur
 
 (function(){
   const k=DATA.consumption.kpis,t=DATA.team,c=DATA.current,run=DATA.consumption.run;
-  const lead=(c.rows&&c.rows[0])?`${c.rows[0].rep} (${c.rows[0].points})`:"open";
+  const top=c.rows&&c.rows[0];
+  const nobody=top&&NONREP.has(top.rep);
+  const lead=!top?"—":(nobody?"Nobody":`${top.rep} (${top.points})`);
+  const repsCount=(c.rows||[]).filter(r=>!NONREP.has(r.rep)).length;
   const cards=IS_PUBLIC?[
     [c.label,"Current quarter",`${c.days_left} days left`],
-    [lead,"Current leader","unique doctors signed"],
-    [(c.rows||[]).length,"Reps competing","this quarter"],
+    [lead,"Current leader",nobody?"no rep is leading":"unique doctors signed"],
+    [repsCount,"Reps competing","this quarter"],
     [fmt(t.clinics),"Doctors reached","all-time, nationwide"],
     [fmt(t.bottles),"Sample bottles","into clinics all-time"],
   ]:[
@@ -189,7 +221,8 @@ document.getElementById("cqdays").textContent=DATA.current.days_left+" days left
 leaderboard(document.getElementById("leaderboard"),DATA.current);
 pastQ(document.getElementById("past"),DATA.past);
 
-if(!IS_PUBLIC){
+{
+  // Charts render in BOTH the public board and the management view (shared code path).
   const c=DATA.consumption;
   line("byMonth",c.by_month,"bottles");
   line("reqMonth",c.by_month,"requests","#06827b");
@@ -202,11 +235,11 @@ if(!IS_PUBLIC){
   vbars("orderMix",c.order_mix,"n","k");
   vbars("reach",c.reach,"new","label");
   stacked("newrep",c.newrep);
-  const rr=c.run,pct=rr.total?Math.round(rr.elapsed/rr.total*100):0;
-  document.getElementById("runrate").innerHTML=
-    `<div class="n">${fmt(rr.projected)}</div><div class="l">Projected bottles, ${esc(rr.label)}</div>`+
-    `<div class="s">${fmt(rr.so_far)} so far · ${pct}% of quarter elapsed</div>`;
-  if(typeof RECORDS!=="undefined"){
+  const rrEl=document.getElementById("runrate");
+  if(rrEl){const rr=c.run,pct=rr.total?Math.round(rr.elapsed/rr.total*100):0;
+    rrEl.innerHTML=`<div class="n">${fmt(rr.projected)}</div><div class="l">Projected bottles, ${esc(rr.label)}</div><div class="s">${fmt(rr.so_far)} so far · ${pct}% of quarter elapsed</div>`;}
+}
+if(typeof RECORDS!=="undefined"){
     const H=[["date","Date"],["clinic","Clinic"],["doctor","Doctor"],["province","Prov"],["phone","Phone"],["address","Address"],["samples","Bottles"],["license","Licence"],["rep","Referrer"]];
     document.getElementById("thead").innerHTML=H.map(h=>`<th data-k="${h[0]}">${esc(h[1])}</th>`).join("");
     let sk="date",sd=-1,flt="",rep="";const sel=document.getElementById("repf");
@@ -218,7 +251,6 @@ if(!IS_PUBLIC){
     document.querySelectorAll("#thead th").forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(k===sk)sd*=-1;else{sk=k;sd=(k==="samples"||k==="date")?-1:1;}draw();});
     document.getElementById("search").oninput=e=>{flt=e.target.value.toLowerCase().trim();draw();};sel.onchange=e=>{rep=e.target.value;draw();};draw();
   }
-}
 document.getElementById("stamp").textContent=DATA.stamp;
 
 }
