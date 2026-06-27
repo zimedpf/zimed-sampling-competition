@@ -605,7 +605,7 @@ def main():
     data = build(records)
 
     if "--encrypted" in args:
-        pw = os.environ.get("MGMT_PASSPHRASE")
+        pw = (os.environ.get("MGMT_PASSPHRASE") or "").strip()
         if not pw: sys.exit("MGMT_PASSPHRASE env not set; refusing to build management page.")
         cipher = encrypt_payload(pw, {"DATA": data, "RECORDS": records})
         html = page(data, records, "encrypted", cipher)
