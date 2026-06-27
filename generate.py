@@ -800,14 +800,14 @@ function samplesVsSales(id,samples,sales){const host=document.getElementById(id)
   set("heroLeader",nobody?"Nobody yet":topRep.rep);
   set("heroLeaderSub",nobody?"no rep is leading":`${topRep.points} unique doctor${topRep.points===1?'':'s'}`);
   set("heroDrops",fmt(k.drops));
-  set("heroDropsSub",`${fmt(t.clinics)} doctors reached · ${fmt(t.bottles)} bottles`);
+  set("heroDropsSub",`${fmt(t.clinics)} doctors reached · ${fmt(t.bottles)} sample bottles`);
   // --- secondary readout strip (same on both views) ---
   const cards=[
     [fmt(t.bottles),"Sample bottles","into clinics all-time"],
     [fmt(t.clinics),"Doctors reached","unique, nationwide"],
     [repsCount,"Reps competing","this period"],
-    [fmt(k.requests),"Sample requests","forms signed all-time"],
-    [k.avg_per_req,"Avg bottles / form","typical order size"],
+    [fmt(k.requests),"Sample requests","request forms, all-time"],
+    [k.avg_per_req,"Avg bottles / request","typical order size"],
   ];
   document.getElementById("kpis").innerHTML=cards.map(x=>`<div class="kpi"><div class="n">${esc(x[0])}</div><div class="l">${esc(x[1])}</div><div class="s">${esc(x[2])}</div></div>`).join("");
 })();
@@ -883,63 +883,97 @@ def page(data, records, mode, cipher=None):
     title = "Zimed Sampling Competition" + ("" if is_public else " — Management View")
     img = brand_img(is_public)
     img_tag = f'<img class="prod" src="{img}" alt="Zimed PF">' if img else ""
-    charts = """
-    <div class="sec">Volume &amp; trend</div>
-    <div class="cols">
-      <div class="card"><h2>Sample bottles by month</h2><p class="note">Total bottles requested each month (all-time).</p><div id="byMonth"></div></div>
-      <div class="card"><h2>Cumulative bottles</h2><p class="note">Running total into clinics over time.</p><div id="cumulative"></div></div>
-    </div>
-    <div class="cols">
-      <div class="card"><h2>Avg bottles per request over time</h2><p class="note">Order size trend (monthly).</p><div id="avgMonth"></div></div>
-      <div class="card"><h2>Requests by month</h2><p class="note">Frequency — how many forms signed each month.</p><div id="reqMonth"></div></div>
-    </div>
-    <div class="sec">Growth &amp; geography</div>
-    <div class="cols">
-      <div class="card"><h2>Bottles by quarter</h2><p class="note">Quarterly volume with quarter-over-quarter growth %.</p><div id="byQuarter"></div></div>
-      <div class="card"><h2>Bottles by province</h2><p class="note">Where the samples are going.</p><div id="byProvince"></div></div>
-    </div>
-    <div class="card"><h2>Bottles by referrer</h2><p class="note">Total volume credited to each name (everyone, incl. non-competitors).</p><div id="byRep"></div></div>
-    <div class="sec">Adoption, reach &amp; cadence</div>
-    <div class="cols">
-      <div class="card"><h2>Sample adoption progression</h2><p class="note">Doctors grouped by how many times they've requested.</p><div id="adoption"></div></div>
-      <div class="card"><h2>Order-size mix</h2><p class="note">Bottles requested per form.</p><div id="orderMix"></div></div>
-    </div>
-    <div class="cols">
-      <div class="card"><h2>New doctors reached by quarter</h2><p class="note">First-time prescribers signing each quarter.</p><div id="reach"></div></div>
-      <div class="card"><h2>New vs repeat volume by quarter</h2><p class="note"><span class="pill">teal = new</span> &nbsp; <span class="pill" style="background:#fff3d6;color:#9a6b00">gold = repeat</span></p><div id="newrep"></div></div>
-    </div>
-    <div class="sec">Competition outlook</div>
-    <div class="cols">
-      <div class="card"><h2>Current-period run-rate</h2><p class="note">Projected bottle volume for the period if the current pace holds.</p><div class="kpi" id="runrate" style="margin-top:8px;border:1px solid var(--line);border-radius:11px"></div></div>
-      <div class="card"><h2>On pace to win</h2><p class="note">Unique doctors so far <span class="pmut">→ projected at the current rate</span> for each competing rep.</p><div id="projection"></div></div>
-    </div>"""
-    mgmt = "" if is_public else """
-    <div class="sec">Management analytics <span class="mgmttag">internal</span></div>
-    <div class="card"><h2>Rep momentum</h2><p class="note">Unique doctors signed each quarter, per competing rep. Latest quarter in gold; arrow shows change vs the prior quarter.</p><div id="momentum"></div></div>
-    <div class="cols">
-      <div class="card"><h2>Bottles by territory</h2><p class="note">Provinces rolled up West / Central / Atlantic.</p><div id="byRegion"></div></div>
-      <div class="card"><h2>Lapsed reach</h2><p class="note">Doctors who haven’t requested recently — the re-engagement pool.</p><div id="lapsed"></div></div>
-    </div>
-    <div class="cols">
-      <div class="card"><h2>Rep efficiency</h2><p class="note">Doctors reached and average order size per competing rep.</p><div id="efficiency"></div></div>
-      <div class="card"><h2>Data-quality flags</h2><p class="note">Submissions missing fields that weaken attribution or geography.</p><div id="dataquality"></div></div>
-    </div>"""
     sales_through = (data.get("sales") or {}).get("through", "") if has_sales else ""
-    salessec = "" if not has_sales else f"""
-    <div class="sec">Zimed sales <span class="mgmttag">confidential</span></div>
-    <div class="card" style="background:linear-gradient(180deg,#FBFDFC,#fff)"><p class="note" style="margin:0">Actual Zimed unit sales and revenue from Clarion Finance (wholesaler invoices), through <strong>{sales_through}</strong>. Confidential — this data lives only inside this encrypted page, never on the public board.</p></div>
-    <div class="kpis" id="salesKpis"></div>
-    <div class="cols">
-      <div class="card"><h2>Sales by province</h2><p class="note">Net revenue and bottles sold per province (wholesaler ship-to location).</p><div id="salesProvince"></div></div>
-      <div class="card"><h2>Sales by month</h2><p class="note"><span class="pill">teal bars = bottles</span> &nbsp;<span class="pill" style="background:#FCF3DC;color:#9a6b00">gold line = revenue $</span></p><div id="salesMonth"></div></div>
-    </div>
-    <div class="card"><h2>Top wholesalers</h2><p class="note">Distributors buying Zimed, by net revenue (all-time).</p><div id="salesCustomers"></div></div>
-    <div class="card"><h2>Samples vs sales by province</h2><p class="note"><span class="pill">teal = sampled</span> &nbsp;<span class="pill" style="background:#FCF3DC;color:#9a6b00">gold = sold</span> &nbsp; Bottles sampled into clinics vs paid bottles sold. Directional — sample province is the clinic, sales province is the wholesaler depot.</p><div id="samplesVsSales"></div></div>"""
-    table = "" if is_public else """
-    <div class="sec">Full data</div>
-    <div class="card"><h2>All submissions</h2><p class="note">Click a header to sort; type to filter.</p>
-      <div class="toolbar"><input id="search" placeholder="Search clinic, doctor, address, referrer…"><select id="repf"></select><span class="note" id="rc"></span></div>
-      <div class="tin"><table><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table></div></div>"""
+    prizes_str = ' / '.join('$'+format(p, ',') for p in PRIZES)
+    # ---- Layout helpers + per-chart card snippets (IDs are stable; renderers find them by id,
+    # so cards can be placed in any order/section/mode safely). The page is assembled into TWO
+    # bodies below: the public board stays contest-first; the management view leads with product
+    # movement, per Krish (2026-06-27). "Samples" = free bottles into clinics; "sales" = paid units. ----
+    def _sec(t): return f'<div class="sec">{t}</div>'
+    def _cols(*cards): return '<div class="cols">' + ''.join(cards) + '</div>'
+
+    KPI_STRIP       = '<div class="kpis" id="kpis"></div>'
+    SALES_KPI_STRIP = '<div class="kpis" id="salesKpis"></div>'
+
+    C_CURRENT = ('<div class="card"><h2><span id="cqlabel"></span><span class="countdown" id="cqdays"></span></h2>'
+                 '<div class="qtot" id="cqtot"></div>'
+                 f'<p class="note">Live competition. Top three win {prizes_str}. Score = unique doctors signed.</p>'
+                 '<div id="leaderboard"></div></div>')
+    C_PAST = ('<div class="card"><h2>Past contest periods</h2><p class="note">Final standings by period. 🥇🥈🥉 = top three. '
+              'The doctor count is the total unique doctors signed that period across all contest participants, deduped, so it can run higher '
+              'than the rep rows shown (those list only the current top reps). It includes requests where the doctor was unsure or came from '
+              'another doctor, and excludes forms attributed to Krish and Aymeric.</p><div id="past"></div></div>')
+
+    # Sampling volume & trend
+    C_BYMONTH    = '<div class="card"><h2>Sample bottles by month</h2><p class="note">Free sample bottles requested each month (all-time).</p><div id="byMonth"></div></div>'
+    C_CUMULATIVE = '<div class="card"><h2>Cumulative sample bottles</h2><p class="note">Running total of sample bottles into clinics over time.</p><div id="cumulative"></div></div>'
+    C_AVGMONTH   = '<div class="card"><h2>Avg sample bottles per request</h2><p class="note">Typical order size over time (monthly).</p><div id="avgMonth"></div></div>'
+    C_REQMONTH   = '<div class="card"><h2>Sample requests by month</h2><p class="note">How many request forms were signed each month.</p><div id="reqMonth"></div></div>'
+    C_BYQUARTER  = '<div class="card"><h2>Sample bottles by quarter</h2><p class="note">Quarterly sample volume with quarter-over-quarter growth %.</p><div id="byQuarter"></div></div>'
+    # Reach & adoption
+    C_REACH    = '<div class="card"><h2>New doctors reached by quarter</h2><p class="note">First-time prescribers signing each quarter.</p><div id="reach"></div></div>'
+    C_ADOPTION = "<div class=\"card\"><h2>Sample adoption progression</h2><p class=\"note\">Doctors grouped by how many times they've requested samples.</p><div id=\"adoption\"></div></div>"
+    C_ORDERMIX = '<div class="card"><h2>Order-size mix</h2><p class="note">Sample bottles requested per form.</p><div id="orderMix"></div></div>'
+    C_NEWREP   = '<div class="card"><h2>New vs repeat sample volume by quarter</h2><p class="note"><span class="pill">teal = new</span> &nbsp; <span class="pill" style="background:#fff3d6;color:#9a6b00">gold = repeat</span></p><div id="newrep"></div></div>'
+    # Geography
+    C_BYPROVINCE = '<div class="card"><h2>Sample bottles by province</h2><p class="note">Where the free samples are landing (clinic location).</p><div id="byProvince"></div></div>'
+    C_BYREGION   = '<div class="card"><h2>Sample bottles by territory</h2><p class="note">Provinces rolled up West / Central / Atlantic.</p><div id="byRegion"></div></div>'
+    # Contest outlook + attribution
+    C_RUNRATE    = '<div class="card"><h2>Current-period run-rate</h2><p class="note">Projected sample bottle volume for the period if the current pace holds.</p><div class="kpi" id="runrate" style="margin-top:8px;border:1px solid var(--line);border-radius:11px"></div></div>'
+    C_PROJECTION = '<div class="card"><h2>On pace to win</h2><p class="note">Unique doctors so far <span class="pmut">→ projected at the current rate</span> for each competing rep.</p><div id="projection"></div></div>'
+    C_BYREP      = '<div class="card"><h2>Sample bottles by referrer</h2><p class="note">Total sample volume credited to each name (everyone, incl. non-competitors).</p><div id="byRep"></div></div>'
+    # Management-only: contest momentum + operations
+    C_MOMENTUM   = '<div class="card"><h2>Rep momentum</h2><p class="note">Unique doctors signed each quarter, per competing rep. Latest quarter in gold; arrow shows change vs the prior quarter.</p><div id="momentum"></div></div>'
+    C_LAPSED     = "<div class=\"card\"><h2>Lapsed reach</h2><p class=\"note\">Doctors who haven't requested recently — the re-engagement pool.</p><div id=\"lapsed\"></div></div>"
+    C_EFFICIENCY = '<div class="card"><h2>Rep efficiency</h2><p class="note">Doctors reached and average order size per competing rep.</p><div id="efficiency"></div></div>'
+    C_DQ         = '<div class="card"><h2>Data-quality flags</h2><p class="note">Submissions missing fields that weaken attribution or geography.</p><div id="dataquality"></div></div>'
+    # Paid sales (management-only, confidential)
+    SALES_NOTE = (f'<div class="card" style="background:linear-gradient(180deg,#FBFDFC,#fff)"><p class="note" style="margin:0">'
+                  '<strong>Samples vs sales.</strong> Samples are free bottles placed into clinics (the JotForm activity above). '
+                  'Sales are paid units bought by wholesalers, from Clarion Finance invoices through '
+                  f'<strong>{sales_through}</strong>. Confidential — this lives only inside this encrypted page, never on the public board.</p></div>')
+    C_SALES_MONTH    = '<div class="card"><h2>Sales by month</h2><p class="note"><span class="pill">teal bars = units sold</span> &nbsp;<span class="pill" style="background:#FCF3DC;color:#9a6b00">gold line = revenue $</span></p><div id="salesMonth"></div></div>'
+    C_SALES_PROVINCE = '<div class="card"><h2>Sales by province</h2><p class="note">Net revenue and paid units sold per province (wholesaler ship-to location).</p><div id="salesProvince"></div></div>'
+    C_SALES_CUSTOMERS= '<div class="card"><h2>Top wholesalers</h2><p class="note">Distributors buying Zimed, by net revenue (all-time).</p><div id="salesCustomers"></div></div>'
+    C_SAMPLES_VS_SALES = ('<div class="card"><h2>Samples vs sales by province</h2><p class="note"><span class="pill">teal = sampled (free)</span> &nbsp;'
+                          '<span class="pill" style="background:#FCF3DC;color:#9a6b00">gold = sold (paid)</span> &nbsp; '
+                          'Directional — sample province is the clinic, sales province is the wholesaler depot.</p><div id="samplesVsSales"></div></div>')
+    TABLE_CARD = ('<div class="card"><h2>All submissions</h2><p class="note">Click a header to sort; type to filter.</p>'
+                  '<div class="toolbar"><input id="search" placeholder="Search clinic, doctor, address, referrer…"><select id="repf"></select><span class="note" id="rc"></span></div>'
+                  '<div class="tin"><table><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table></div></div>')
+
+    if is_public:
+        # Public board: contest-first, no sales, no internal ops. Same charts, cleaned-up copy.
+        body = (
+            KPI_STRIP + C_CURRENT + C_PAST
+            + _sec("Volume &amp; trend") + _cols(C_BYMONTH, C_CUMULATIVE) + _cols(C_AVGMONTH, C_REQMONTH)
+            + _sec("Growth &amp; geography") + _cols(C_BYQUARTER, C_BYPROVINCE) + C_BYREP
+            + _sec("Adoption, reach &amp; cadence") + _cols(C_ADOPTION, C_ORDERMIX) + _cols(C_REACH, C_NEWREP)
+            + _sec("Competition outlook") + _cols(C_RUNRATE, C_PROJECTION)
+        )
+    else:
+        # Management view: product-first narrative (revenue/volume → reach → geography → paid sales →
+        # samples→sales bridge → the contest → internal ops → raw data).
+        body = ""
+        if has_sales:
+            body += _sec('Product at a glance <span class="mgmttag">confidential</span>') + SALES_KPI_STRIP
+        body += (
+            _sec("Sampling volume &amp; trend") + KPI_STRIP
+            + _cols(C_BYMONTH, C_CUMULATIVE) + _cols(C_REQMONTH, C_AVGMONTH) + C_BYQUARTER
+            + _sec("Reach &amp; adoption") + _cols(C_REACH, C_ADOPTION) + _cols(C_ORDERMIX, C_NEWREP)
+            + _sec("Geography") + _cols(C_BYPROVINCE, C_BYREGION)
+        )
+        if has_sales:
+            body += (
+                _sec('Paid sales <span class="mgmttag">confidential</span>') + SALES_NOTE
+                + _cols(C_SALES_MONTH, C_SALES_PROVINCE) + C_SALES_CUSTOMERS
+                + _sec("Samples &rarr; sales") + C_SAMPLES_VS_SALES
+            )
+        body += (
+            _sec("The contest") + C_CURRENT + C_PAST + _cols(C_RUNRATE, C_PROJECTION) + C_MOMENTUM + C_BYREP
+            + _sec('Operations <span class="mgmttag">internal</span>') + _cols(C_LAPSED, C_EFFICIENCY) + C_DQ
+            + _sec("Full data") + TABLE_CARD
+        )
     if mode == "encrypted":
         boot = f"const IS_PUBLIC=false;\nconst CIPHER={dumps(cipher)};\n" + GATE_JS
     else:
@@ -974,16 +1008,7 @@ def page(data, records, mode, cipher=None):
 </header>
 <div class="wrap">
 {banner}
-<div class="kpis" id="kpis"></div>
-<div class="card"><h2><span id="cqlabel"></span><span class="countdown" id="cqdays"></span></h2>
-<div class="qtot" id="cqtot"></div>
-<p class="note">Live competition. Top three win {' / '.join('$'+format(p,',') for p in PRIZES)}. Score = unique doctors signed.</p>
-<div id="leaderboard"></div></div>
-<div class="card"><h2>Past contest periods</h2><p class="note">Final standings by period. 🥇🥈🥉 = top three. The doctor count is the total unique doctors signed that period across all contest participants, deduped, so it can run higher than the rep rows shown (those list only the current top reps). It includes requests where the doctor was unsure or came from another doctor, and excludes forms attributed to Krish and Aymeric.</p><div id="past"></div></div>
-{charts}
-{mgmt}
-{salessec}
-{table}
+{body}
 <div class="foot">{foot}</div></div>
 <script>{script}</script></body></html>"""
 
