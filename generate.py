@@ -42,6 +42,18 @@ PROV = {"british columbia":"BC","bc":"BC","alberta":"AB","ab":"AB","saskatchewan
         "prince edward island":"PE","pe":"PE","pei":"PE","yukon":"YT","yt":"YT",
         "northwest territories":"NT","nt":"NT","nunavut":"NU","nu":"NU"}
 
+# Province -> region rollup (geographic L-to-R: West, Central, Atlantic). Anything
+# unmapped (incl. blank/"—") falls into "Unknown" and is only shown if non-empty.
+REGION = {"BC":"West","AB":"West","SK":"West","MB":"West","YT":"West","NT":"West","NU":"West",
+          "ON":"Central","QC":"Central",
+          "NB":"Atlantic","NS":"Atlantic","PE":"Atlantic","NL":"Atlantic"}
+REGION_ORDER = ["West","Central","Atlantic","Unknown"]
+LAPSED_DAYS = 90  # a doctor with no request in this many days counts as "lapsed"
+
+def eligible_reps(current_reps):
+    """Competing reps = current dropdown options minus program-runners and catch-alls."""
+    return [r for r in current_reps if r not in EXCLUDE and r not in NONREP_NAMES]
+
 # ---- JotForm fetch ----
 def api(path):
     url = f"https://api.jotform.com/{path}{'&' if '?' in path else '?'}apiKey={KEY}"
@@ -150,7 +162,7 @@ def build_competition(records, today, current_reps):
         past.append({"label": qlabel(y, q), "rows": rr, "winner": rr[0]["rep"] if rr else None})
     return current, past
 
-def build_consumption(records, today):
+def build_consumption(records, today, current_reps):
     yr = str(today.year)
     bottles = sum(r["samples"] for r in records)
     dcount = collections.Counter(r["dkey"] for r in records)
@@ -228,7 +240,69 @@ def build_consumption(records, today):
     qend = quarter_end(cy, cq)
     cur_b = sum(r["samples"] for r in records if r["year"]==str(cy) and r["q"]==cq)
     elapsed = (today - qstart).days + 1; total_days = (qend - qstart).days + 1
+    frac = elapsed / total_days if total_days else 1
     projected = round(cur_b / elapsed * total_days) if elapsed > 0 else cur_b
+
+    # ---- management-only / competition analytics ----
+    eligible = eligible_reps(current_reps)
+
+    # territory rollup (West / Central / Atlantic / Unknown)
+    reg = collections.Counter()
+    for r in records: reg[REGION.get(r["province"], "Unknown")] += r["samples"]
+    by_region = [{"k": k, "bottles": reg[k]} for k in REGION_ORDER if reg[k]]
+
+    # lapsed reach: days since each doctor's most recent request (asc => last wins)
+    last_seen = {}
+    for r in asc: last_seen[r["dkey"]] = r["date"]
+    lap = {"active": 0, "mid": 0, "deep": 0}
+    for d in last_seen.values():
+        days = (today - datetime.date.fromisoformat(d)).days
+        if days <= LAPSED_DAYS: lap["active"] += 1
+        elif days <= 2*LAPSED_DAYS: lap["mid"] += 1
+        else: lap["deep"] += 1
+    lapsed = {"days": LAPSED_DAYS, "total": uniq, "lapsed": lap["mid"]+lap["deep"],
+              "active": lap["active"], "mid": lap["mid"], "deep": lap["deep"]}
+
+    # rep efficiency: unique doctors reached, bottles, bottles/doctor (eligible reps only)
+    efficiency = []
+    for rep in eligible:
+        rrs = [r for r in records if r["rep"] == rep]
+        dset = set(r["dkey"] for r in rrs); b = sum(r["samples"] for r in rrs)
+        if not dset: continue
+        efficiency.append({"k": rep, "docs": len(dset), "bottles": b,
+                           "per_doc": round(b/len(dset), 1)})
+    efficiency.sort(key=lambda x: -x["docs"])
+
+    # data-quality flags (aggregate counts only)
+    dq = {"no_rep": sum(1 for r in records if r["rep"] in ("(blank)", "")),
+          "no_rep_bottles": sum(r["samples"] for r in records if r["rep"] in ("(blank)", "")),
+          "no_province": sum(1 for r in records if not r["province"] or r["province"] == "—"),
+          "no_license": sum(1 for r in records if not r["license"]),
+          "total": len(records)}
+
+    # rep momentum: unique doctors per quarter, per eligible rep (small-multiples)
+    momentum = []
+    for rep in eligible:
+        series = []
+        for (y, q) in qs:
+            docs = len(set(r["dkey"] for r in records
+                           if r["rep"] == rep and r["year"] == y and r["q"] == q))
+            series.append({"label": qlabel(y, q), "n": docs})
+        if any(s["n"] for s in series):
+            momentum.append({"k": rep, "series": series})
+    momentum.sort(key=lambda m: -sum(s["n"] for s in m["series"]))
+
+    # competition projection: current-quarter unique doctors per rep, projected at pace
+    proj = []
+    for rep in eligible:
+        now = len(set(r["dkey"] for r in records
+                      if r["rep"] == rep and r["year"] == str(cy) and r["q"] == cq))
+        projected_docs = round(now/frac) if frac > 0 else now
+        if now or projected_docs:
+            proj.append({"k": rep, "now": now, "proj": max(projected_docs, now)})
+    proj.sort(key=lambda x: (-x["proj"], -x["now"]))
+    projection = {"label": qlabel(cy, cq), "pct_elapsed": round(frac*100),
+                  "days_left": max(0, (qend - today).days), "rows": proj}
 
     return {
         "kpis": {"bottles": bottles, "drops": bottles*DROPS_PER_BOTTLE, "requests": len(records),
@@ -241,6 +315,8 @@ def build_consumption(records, today):
         "reach": reach, "newrep": newrep,
         "run": {"label": qlabel(cy, cq), "so_far": cur_b, "projected": projected,
                 "elapsed": elapsed, "total": total_days},
+        "by_region": by_region, "lapsed": lapsed, "efficiency": efficiency,
+        "dq": dq, "momentum": momentum, "projection": projection,
     }
 
 def build(records):
@@ -251,7 +327,7 @@ def build(records):
             "bottles": sum(r["samples"] for r in records)}
     latest = records[0]["date"] if records else "-"
     return {"current": current, "past": past, "team": team,
-            "consumption": build_consumption(records, today),
+            "consumption": build_consumption(records, today, current_reps),
             "stamp": f"data through {latest} ({len(records)} submissions all-time)"}
 
 def brand_img(is_public):
@@ -315,7 +391,47 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}.tin{max-height:520px;
 .toolbar input{flex:1;min-width:200px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px}
 .toolbar select{padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:#fff}
 .foot{font-size:11.5px;color:var(--muted);margin-top:24px;line-height:1.55}.luvo{font-weight:800;letter-spacing:1px;color:var(--teal-d)}
-@media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}.cols{grid-template-columns:1fr}header img.prod{display:none}}
+.empty{fill:var(--grey);font-size:13px;font-weight:600}
+.pmut{color:var(--muted);font-weight:600}
+.mgmttag{font-size:9.5px;font-weight:800;background:#fff4f1;color:#9c3b25;border:1px solid #f7b3a3;border-radius:20px;padding:1px 8px;vertical-align:middle;margin-left:6px}
+/* windowing toggle */
+.winctl{display:flex;justify-content:flex-end;align-items:center;gap:8px;font-size:11px;color:var(--muted);margin:-2px 0 2px}
+.winctl button{font:inherit;font-size:11px;font-weight:700;color:var(--teal-d);background:#e2f5f3;border:1px solid #b6e6e1;border-radius:20px;padding:2px 10px;cursor:pointer}
+.winctl button:hover{background:#d2efec}
+/* competition projection */
+.projbars{display:flex;flex-direction:column;gap:7px;margin-top:2px}
+.projrow{display:grid;grid-template-columns:96px 1fr 70px;align-items:center;gap:10px;font-size:12px}
+.projrow .pname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ptrack{position:relative;background:#eef3f2;border-radius:5px;height:16px;overflow:hidden}
+.ptrack .ppace{position:absolute;inset:0 auto 0 0;height:100%;background:repeating-linear-gradient(135deg,#cdeeeb,#cdeeeb 5px,#dbf2f0 5px,#dbf2f0 10px)}
+.ptrack .pnow{position:absolute;inset:0 auto 0 0;height:100%;background:var(--teal);border-radius:5px}
+.projrow .pval{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+/* rep momentum small-multiples */
+.sparkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:4px}
+.sparkcell{border:1px solid var(--line);border-radius:10px;padding:9px 11px 8px;background:#fbfdfd}
+.sparkcell .sname{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sparkcell .snums{display:flex;align-items:baseline;gap:7px;margin:1px 0 2px}
+.sparkcell .slast{font-size:20px;font-weight:800;line-height:1}
+.sparkcell .sdelta{font-size:11px;font-weight:700}
+.sdelta.up{color:#06827b}.sdelta.down{color:#c0392b}.sdelta.flat{color:var(--muted)}
+.spark{width:100%;height:44px;display:block}
+.sparkcell .sfoot{font-size:9.5px;color:var(--muted);margin-top:3px}
+/* mini efficiency table */
+table.mini{font-size:12.5px}table.mini th{cursor:default}table.mini td{border-bottom:1px solid var(--line)}
+/* lapsed reach */
+.bigstat .n{font-size:30px;font-weight:800;line-height:1}.bigstat .l{font-size:12.5px;margin-top:4px}.bigstat .s{font-size:11.5px;color:var(--muted);margin-top:3px}
+.segbar{display:flex;height:16px;border-radius:6px;overflow:hidden;margin:12px 0 7px;background:#eef3f2}
+.seg{min-width:2px}.seg.act{background:#9fd9d4}.seg.mid{background:#FAB718}.seg.deep{background:#e07a52}
+.seglegend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted)}
+.seglegend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.seglegend i.act{background:#9fd9d4}.seglegend i.mid{background:#FAB718}.seglegend i.deep{background:#e07a52}
+/* data-quality */
+.dqgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.dqcard{border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:#fbfdfd}
+.dqcard.warn{border-color:#f3cbbe;background:#fff8f4}
+.dqcard .n{font-size:21px;font-weight:800;line-height:1}.dqcard.warn .n{color:#c0562f}.dqcard.ok .n{color:#06827b}
+.dqcard .l{font-size:11.5px;font-weight:600;margin-top:4px}.dqcard .s{font-size:10.5px;color:var(--muted);margin-top:2px}
+@media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}.cols{grid-template-columns:1fr}header img.prod{display:none}.dqgrid{grid-template-columns:1fr}.projrow{grid-template-columns:78px 1fr 64px}}
 """
 
 DROP_SVG = ('<svg width="34" height="34" viewBox="0 0 24 24">'
@@ -328,6 +444,20 @@ const NS="http://www.w3.org/2000/svg";
 function el(t,a,x){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(x!=null)e.textContent=x;return e;}
 const MEDAL=["🥇","🥈","🥉"];
 const fmt=n=>(+n).toLocaleString();
+// abbreviate large axis/value numbers: 11090 -> 11.1k, 4000 -> 4k
+const kfmt=n=>{n=+n;const a=Math.abs(n);if(a>=1e6)return(n/1e6).toFixed(a%1e6?1:0).replace(/\.0$/,"")+"M";if(a>=1000)return(n/1000).toFixed(a%1000?1:0).replace(/\.0$/,"")+"k";return""+n;};
+// Window long time-series so labels never collide: show the most recent N by
+// default with a "Show all" toggle that re-renders the full history in place.
+function windowed(host,items,draw){
+  const WIN=12;host.innerHTML="";
+  if(items.length<=WIN){draw(host,items);return;}
+  const all=host.dataset.all==="1",shown=all?items:items.slice(-WIN);
+  const ctl=document.createElement("div");ctl.className="winctl";
+  ctl.innerHTML=`<span>${all?`All ${items.length} points`:`Last ${WIN} of ${items.length}`}</span>`;
+  const btn=document.createElement("button");btn.textContent=all?`Recent ${WIN}`:"Show all";
+  btn.onclick=()=>{host.dataset.all=all?"":"1";windowed(host,items,draw);};
+  ctl.appendChild(btn);host.appendChild(ctl);
+  const box=document.createElement("div");host.appendChild(box);draw(box,shown);}
 
 function ordinal(n){const v=n%100,s=["th","st","nd","rd"];return n+(s[(v-20)%10]||s[v]||s[0]);}
 function leaderboard(host,q){
@@ -384,38 +514,98 @@ function hbars(id,items,key){key=key||"bottles";const host=document.getElementBy
   items.forEach(it=>{const row=document.createElement("div");row.className="hbar";
     row.innerHTML=`<div title="${esc(it.k)}">${esc(it.k)}</div><div class="t"><div class="f" style="width:${Math.max(3,it[key]/max*100)}%"></div></div><div class="v">${fmt(it[key])}</div>`;
     w.appendChild(row);});host.appendChild(w);}
+const EMPTY=(s,W,H)=>{s.appendChild(el("text",{x:W/2,y:H/2,"text-anchor":"middle",class:"empty"},"No data yet"));return s;};
+function gridY(s,max,pL,pR,pT,ph,W){for(let g=0;g<=4;g++){const yv=Math.round(max*g/4),y=pT+ph-(yv/max)*ph;
+  s.appendChild(el("line",{x1:pL,y1:y,x2:W-pR,y2:y,class:"gridline"}));
+  s.appendChild(el("text",{x:pL-7,y:y+4,"text-anchor":"end",class:"tick"},kfmt(yv)));}}
+function buildLine(items,key,color){
+  const W=520,H=210,pL=44,pR=16,pT=16,pB=28,vals=items.map(m=>m[key]),max=Math.max(1,...vals),pw=W-pL-pR,ph=H-pT-pB;
+  const s=el("svg",{viewBox:`0 0 ${W} ${H}`});if(!items.length)return EMPTY(s,W,H);
+  gridY(s,max,pL,pR,pT,ph,W);
+  const single=items.length===1,st=single?0:pw/(items.length-1);
+  const xp=i=>single?pL+pw/2:pL+i*st;
+  const pts=vals.map((v,i)=>[xp(i),pT+ph-(v/max)*ph]);
+  if(pts.length>1){let dp="";pts.forEach((p,i)=>dp+=(i?"L":"M")+p[0]+" "+p[1]+" ");
+    s.appendChild(el("path",{d:dp+`L ${pts.at(-1)[0]} ${pT+ph} L ${pts[0][0]} ${pT+ph} Z`,fill:color+"22"}));
+    s.appendChild(el("path",{d:dp,fill:"none",stroke:color,"stroke-width":2.5}));}
+  const lstep=Math.ceil(items.length/12);  // thin x-labels so they never collide
+  pts.forEach((p,i)=>{const c=el("circle",{cx:p[0],cy:p[1],r:3.5,fill:"#fff",stroke:color,"stroke-width":2.5});
+    c.appendChild(el("title",null,`${items[i].label}: ${fmt(vals[i])}`));s.appendChild(c);
+    if(items.length<=8)s.appendChild(el("text",{x:p[0],y:p[1]-8,"text-anchor":"middle",class:"vlab"},kfmt(vals[i])));
+    if(i%lstep===0||i===items.length-1)s.appendChild(el("text",{x:p[0],y:H-9,"text-anchor":"middle",class:"tick"},items[i].label));});
+  return s;}
 function line(id,items,key,color){const host=document.getElementById(id);if(!host)return;color=color||"#03BAB3";
-  const W=520,H=210,pL=42,pR=16,pT=14,pB=28,vals=items.map(m=>m[key]),max=Math.max(1,...vals),pw=W-pL-pR,ph=H-pT-pB;
-  const s=el("svg",{viewBox:`0 0 ${W} ${H}`});
-  for(let g=0;g<=4;g++){const yv=Math.round(max*g/4),y=pT+ph-(yv/max)*ph;s.appendChild(el("line",{x1:pL,y1:y,x2:W-pR,y2:y,class:"gridline"}));s.appendChild(el("text",{x:pL-7,y:y+4,"text-anchor":"end",class:"tick"},yv));}
-  const st=pw/Math.max(1,items.length-1),pts=vals.map((v,i)=>[pL+i*st,pT+ph-(v/max)*ph]);
-  let dp="";pts.forEach((p,i)=>dp+=(i?"L":"M")+p[0]+" "+p[1]+" ");
-  if(pts.length>1){s.appendChild(el("path",{d:dp+`L ${pts.at(-1)[0]} ${pT+ph} L ${pts[0][0]} ${pT+ph} Z`,fill:color+"22"}));s.appendChild(el("path",{d:dp,fill:"none",stroke:color,"stroke-width":2.5}));}
-  pts.forEach((p,i)=>{const c=el("circle",{cx:p[0],cy:p[1],r:3.5,fill:"#fff",stroke:color,"stroke-width":2.5});c.appendChild(el("title",null,`${items[i].label}: ${vals[i]}`));s.appendChild(c);
-    if(items.length<=8)s.appendChild(el("text",{x:p[0],y:p[1]-8,"text-anchor":"middle",class:"vlab"},vals[i]));
-    s.appendChild(el("text",{x:p[0],y:H-9,"text-anchor":"middle",class:"tick"},items[i].label));});
-  host.appendChild(s);}
-function vbars(id,items,key,labelKey,extra){const host=document.getElementById(id);if(!host)return;labelKey=labelKey||"k";
-  const W=520,H=220,pL=36,pR=12,pT=18,pB=34,vals=items.map(i=>i[key]),max=Math.max(1,...vals),pw=W-pL-pR,ph=H-pT-pB;
-  const s=el("svg",{viewBox:`0 0 ${W} ${H}`});
-  for(let g=0;g<=4;g++){const yv=Math.round(max*g/4),y=pT+ph-(yv/max)*ph;s.appendChild(el("line",{x1:pL,y1:y,x2:W-pR,y2:y,class:"gridline"}));s.appendChild(el("text",{x:pL-7,y:y+4,"text-anchor":"end",class:"tick"},yv));}
-  const bw=pw/items.length*0.6,step=pw/items.length;
+  windowed(host,items,(box,data)=>box.appendChild(buildLine(data,key,color)));}
+function buildVbars(items,key,labelKey,extra){
+  const W=520,H=220,pL=40,pR=12,pT=18,pB=34,vals=items.map(i=>i[key]),max=Math.max(1,...vals),pw=W-pL-pR,ph=H-pT-pB;
+  const s=el("svg",{viewBox:`0 0 ${W} ${H}`});if(!items.length)return EMPTY(s,W,H);
+  gridY(s,max,pL,pR,pT,ph,W);
+  const step=pw/items.length,bw=Math.min(54,step*0.6),lstep=Math.ceil(items.length/12),showVal=items.length<=14;
   items.forEach((it,i)=>{const x=pL+i*step+step/2,h=(it[key]/max)*ph,y=pT+ph-h;
-    const rc=el("rect",{x:x-bw/2,y:y,width:bw,height:h,rx:3,fill:"#03BAB3"});rc.appendChild(el("title",null,`${it[labelKey]}: ${it[key]}`));s.appendChild(rc);
-    s.appendChild(el("text",{x:x,y:y-5,"text-anchor":"middle",class:"vlab"},it[key]));
-    s.appendChild(el("text",{x:x,y:H-18,"text-anchor":"middle",class:"tick"},it[labelKey]));
-    if(extra&&it[extra]!=null)s.appendChild(el("text",{x:x,y:H-6,"text-anchor":"middle",class:"tick",fill:(it[extra]>=0?"#06827b":"#c0392b")},(it[extra]>0?"+":"")+it[extra]+"%"));});
-  host.appendChild(s);}
-function stacked(id,items){const host=document.getElementById(id);if(!host)return;
-  const W=520,H=220,pL=36,pR=12,pT=18,pB=30,tot=items.map(i=>i.new+i.repeat),max=Math.max(1,...tot),pw=W-pL-pR,ph=H-pT-pB;
-  const s=el("svg",{viewBox:`0 0 ${W} ${H}`});
-  for(let g=0;g<=4;g++){const yv=Math.round(max*g/4),y=pT+ph-(yv/max)*ph;s.appendChild(el("line",{x1:pL,y1:y,x2:W-pR,y2:y,class:"gridline"}));s.appendChild(el("text",{x:pL-7,y:y+4,"text-anchor":"end",class:"tick"},yv));}
-  const bw=pw/items.length*0.55,step=pw/items.length;
+    const rc=el("rect",{x:x-bw/2,y:y,width:bw,height:h,rx:3,fill:"#03BAB3"});rc.appendChild(el("title",null,`${it[labelKey]}: ${fmt(it[key])}`));s.appendChild(rc);
+    if(showVal)s.appendChild(el("text",{x:x,y:y-5,"text-anchor":"middle",class:"vlab"},kfmt(it[key])));
+    if(i%lstep===0||i===items.length-1)s.appendChild(el("text",{x:x,y:H-18,"text-anchor":"middle",class:"tick"},it[labelKey]));
+    if(extra&&it[extra]!=null&&(i%lstep===0||i===items.length-1))s.appendChild(el("text",{x:x,y:H-6,"text-anchor":"middle",class:"tick",fill:(it[extra]>=0?"#06827b":"#c0392b")},(it[extra]>0?"+":"")+it[extra]+"%"));});
+  return s;}
+function vbars(id,items,key,labelKey,extra){const host=document.getElementById(id);if(!host)return;labelKey=labelKey||"k";
+  windowed(host,items,(box,data)=>box.appendChild(buildVbars(data,key,labelKey,extra)));}
+function buildStacked(items){
+  const W=520,H=220,pL=40,pR=12,pT=18,pB=30,tot=items.map(i=>i.new+i.repeat),max=Math.max(1,...tot),pw=W-pL-pR,ph=H-pT-pB;
+  const s=el("svg",{viewBox:`0 0 ${W} ${H}`});if(!items.length)return EMPTY(s,W,H);
+  gridY(s,max,pL,pR,pT,ph,W);
+  const step=pw/items.length,bw=Math.min(50,step*0.55),lstep=Math.ceil(items.length/12);
   items.forEach((it,i)=>{const x=pL+i*step+step/2;const hN=(it.new/max)*ph,hR=(it.repeat/max)*ph;
     let y=pT+ph;const r1=el("rect",{x:x-bw/2,y:y-hN,width:bw,height:hN,fill:"#03BAB3"});r1.appendChild(el("title",null,`${it.label} new: ${it.new}`));s.appendChild(r1);y-=hN;
     const r2=el("rect",{x:x-bw/2,y:y-hR,width:bw,height:hR,fill:"#FAB718"});r2.appendChild(el("title",null,`${it.label} repeat: ${it.repeat}`));s.appendChild(r2);
-    s.appendChild(el("text",{x:x,y:H-6,"text-anchor":"middle",class:"tick"},it.label));});
-  host.appendChild(s);}
+    if(i%lstep===0||i===items.length-1)s.appendChild(el("text",{x:x,y:H-6,"text-anchor":"middle",class:"tick"},it.label));});
+  return s;}
+function stacked(id,items){const host=document.getElementById(id);if(!host)return;
+  windowed(host,items,(box,data)=>box.appendChild(buildStacked(data)));}
+// ---- competition outlook (both views) ----
+function projection(id,p){const host=document.getElementById(id);if(!host)return;host.innerHTML="";
+  const rows=(p&&p.rows)||[];
+  if(!rows.length){host.innerHTML='<p class="note">No qualifying signatures yet this quarter — wide open.</p>';return;}
+  const max=Math.max(1,...rows.map(r=>r.proj));
+  const w=document.createElement("div");w.className="projbars";
+  rows.forEach(r=>{const row=document.createElement("div");row.className="projrow";
+    row.innerHTML=`<div class="pname" title="${esc(r.k)}">${esc(r.k)}</div>
+      <div class="ptrack"><div class="ppace" style="width:${Math.max(2,r.proj/max*100)}%"></div><div class="pnow" style="width:${Math.max(2,r.now/max*100)}%" title="${r.now} so far"></div></div>
+      <div class="pval">${r.now}<span class="pmut"> → ${r.proj}</span></div>`;
+    w.appendChild(row);});
+  host.appendChild(w);}
+// ---- management-only renderers (containers only emitted in the mgmt view) ----
+function sparkrep(id,reps){const host=document.getElementById(id);if(!host)return;host.innerHTML="";
+  if(!reps||!reps.length){host.innerHTML='<p class="note">No rep activity yet.</p>';return;}
+  const grid=document.createElement("div");grid.className="sparkgrid";
+  reps.forEach(rep=>{const ser=rep.series,vals=ser.map(p=>p.n),max=Math.max(1,...vals);
+    const last=vals.at(-1),prev=vals.length>1?vals.at(-2):0,delta=last-prev;
+    const W=160,H=44,pad=5,single=vals.length<=1,st=single?0:(W-2*pad)/(vals.length-1);
+    const pts=vals.map((v,i)=>[single?W/2:pad+i*st,H-pad-(v/max)*(H-2*pad-4)]);
+    const svg=el("svg",{viewBox:`0 0 ${W} ${H}`,class:"spark"});
+    if(pts.length>1){let dp="";pts.forEach((p,i)=>dp+=(i?"L":"M")+p[0]+" "+p[1]+" ");svg.appendChild(el("path",{d:dp,fill:"none",stroke:"#03BAB3","stroke-width":2}));}
+    pts.forEach((p,i)=>{const last_=i===pts.length-1,c=el("circle",{cx:p[0],cy:p[1],r:last_?3.2:2,fill:last_?"#FAB718":"#03BAB3"});c.appendChild(el("title",null,`${ser[i].label}: ${vals[i]}`));svg.appendChild(c);});
+    const arrow=delta>0?"▲":delta<0?"▼":"–",acl=delta>0?"up":delta<0?"down":"flat";
+    const cell=document.createElement("div");cell.className="sparkcell";
+    cell.innerHTML=`<div class="sname" title="${esc(rep.k)}">${esc(rep.k)}</div><div class="snums"><span class="slast">${last}</span><span class="sdelta ${acl}">${arrow}${delta?Math.abs(delta):""}</span></div>`;
+    cell.appendChild(svg);
+    const f=document.createElement("div");f.className="sfoot";f.textContent=ser[0].label+" → "+ser.at(-1).label;cell.appendChild(f);
+    grid.appendChild(cell);});
+  host.appendChild(grid);}
+function effTable(id,rows){const host=document.getElementById(id);if(!host)return;
+  if(!rows||!rows.length){host.innerHTML='<p class="note">No rep data yet.</p>';return;}
+  let h='<table class="mini"><thead><tr><th>Rep</th><th class="num">Doctors</th><th class="num">Bottles</th><th class="num">Bottles / doctor</th></tr></thead><tbody>';
+  rows.forEach(r=>h+=`<tr><td>${esc(r.k)}</td><td class="num">${r.docs}</td><td class="num">${fmt(r.bottles)}</td><td class="num">${r.per_doc}</td></tr>`);
+  host.innerHTML=h+"</tbody></table>";}
+function lapsedPanel(id,l){const host=document.getElementById(id);if(!host||!l)return;
+  const pct=l.total?Math.round(l.lapsed/l.total*100):0;
+  host.innerHTML=`<div class="bigstat"><div class="n">${fmt(l.lapsed)}</div><div class="l">doctors lapsed (${l.days}+ days since last request)</div><div class="s">${pct}% of ${fmt(l.total)} reached · re-engagement pool</div></div>
+   <div class="segbar"><div class="seg act" style="flex:${Math.max(l.active,0.001)}" title="Active (≤${l.days}d): ${l.active}"></div><div class="seg mid" style="flex:${Math.max(l.mid,0.001)}" title="${l.days}–${2*l.days}d: ${l.mid}"></div><div class="seg deep" style="flex:${Math.max(l.deep,0.001)}" title=">${2*l.days}d: ${l.deep}"></div></div>
+   <div class="seglegend"><span><i class="act"></i>Active ${l.active}</span><span><i class="mid"></i>${l.days}–${2*l.days}d ${l.mid}</span><span><i class="deep"></i>${2*l.days}d+ ${l.deep}</span></div>`;}
+function dqPanel(id,d){const host=document.getElementById(id);if(!host||!d)return;
+  const items=[["No referrer named",d.no_rep,`${fmt(d.no_rep_bottles)} bottles unattributed`],
+    ["Missing province",d.no_province,"can’t be placed on a territory"],
+    ["Missing licence #",d.no_license,"dedupe falls back to name"]];
+  host.innerHTML='<div class="dqgrid">'+items.map(it=>`<div class="dqcard${it[1]?' warn':' ok'}"><div class="n">${fmt(it[1])}</div><div class="l">${esc(it[0])}</div><div class="s">${esc(it[2])}</div></div>`).join("")+`</div><p class="note">Of ${fmt(d.total)} submissions all-time.</p>`;}
 
 (function(){
   const k=DATA.consumption.kpis,t=DATA.team,c=DATA.current,run=DATA.consumption.run;
@@ -457,6 +647,13 @@ pastQ(document.getElementById("past"),DATA.past);
   vbars("orderMix",c.order_mix,"n","k");
   vbars("reach",c.reach,"new","label");
   stacked("newrep",c.newrep);
+  // competition outlook (shared) + management-only analytics (containers gate rendering)
+  projection("projection",c.projection);
+  sparkrep("momentum",c.momentum);
+  vbars("byRegion",c.by_region,"bottles","k");
+  lapsedPanel("lapsed",c.lapsed);
+  effTable("efficiency",c.efficiency);
+  dqPanel("dataquality",c.dq);
   const rrEl=document.getElementById("runrate");
   if(rrEl){const rr=c.run,pct=rr.total?Math.round(rr.elapsed/rr.total*100):0;
     rrEl.innerHTML=`<div class="n">${fmt(rr.projected)}</div><div class="l">Projected bottles, ${esc(rr.label)}</div><div class="s">${fmt(rr.so_far)} so far · ${pct}% of quarter elapsed</div>`;}
@@ -509,9 +706,21 @@ def page(data, records, mode, cipher=None):
       <div class="card"><h2>New doctors reached by quarter</h2><p class="note">First-time prescribers signing each quarter.</p><div id="reach"></div></div>
       <div class="card"><h2>New vs repeat volume by quarter</h2><p class="note"><span class="pill">teal = new</span> &nbsp; <span class="pill" style="background:#fff3d6;color:#9a6b00">gold = repeat</span></p><div id="newrep"></div></div>
     </div>
+    <div class="sec">Competition outlook</div>
     <div class="cols">
-      <div class="card"><h2>Current-quarter run-rate</h2><p class="note">Projection if the current pace holds.</p><div class="kpi" id="runrate" style="margin-top:8px"></div></div>
-      <div class="card"><h2>&nbsp;</h2><p class="note">&nbsp;</p></div>
+      <div class="card"><h2>Current-quarter run-rate</h2><p class="note">Projected bottle volume if the current pace holds.</p><div class="kpi" id="runrate" style="margin-top:8px"></div></div>
+      <div class="card"><h2>On pace to win</h2><p class="note">Unique doctors so far <span class="pmut">→ projected at the current rate</span> for each competing rep.</p><div id="projection"></div></div>
+    </div>"""
+    mgmt = "" if is_public else """
+    <div class="sec">Management analytics <span class="mgmttag">internal</span></div>
+    <div class="card"><h2>Rep momentum</h2><p class="note">Unique doctors signed each quarter, per competing rep. Latest quarter in gold; arrow shows change vs the prior quarter.</p><div id="momentum"></div></div>
+    <div class="cols">
+      <div class="card"><h2>Bottles by territory</h2><p class="note">Provinces rolled up West / Central / Atlantic.</p><div id="byRegion"></div></div>
+      <div class="card"><h2>Lapsed reach</h2><p class="note">Doctors who haven’t requested recently — the re-engagement pool.</p><div id="lapsed"></div></div>
+    </div>
+    <div class="cols">
+      <div class="card"><h2>Rep efficiency</h2><p class="note">Doctors reached and average order size per competing rep.</p><div id="efficiency"></div></div>
+      <div class="card"><h2>Data-quality flags</h2><p class="note">Submissions missing fields that weaken attribution or geography.</p><div id="dataquality"></div></div>
     </div>"""
     table = "" if is_public else """
     <div class="sec">Full data</div>
@@ -544,6 +753,7 @@ def page(data, records, mode, cipher=None):
 <div id="leaderboard"></div></div>
 <div class="card"><h2>Past quarters</h2><p class="note">Final standings by quarter. 🏆 = winner.</p><div id="past"></div></div>
 {charts}
+{mgmt}
 {table}
 <div class="foot">{foot}</div></div>
 <script>{script}</script></body></html>"""
