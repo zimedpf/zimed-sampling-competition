@@ -33,6 +33,13 @@ QID = {"doctor":"2","email":"3","phone":"4","address":"5","samples":"6",
 EXCLUDE = {"Krish Khurana", "Aymeric Paillet", "(blank)", ""}
 # Shown in the standings but NOT eligible for medals/prizes/leader (catch-all answers).
 NONREP_NAMES = ["Unsure", "Another doctor"]
+# GOTCHA / referrer attribution: the form's referrer field ("From whom...") only began
+# capturing answers on 2025-07-21. The 28 forms before that are blank. Per Krish, blank
+# referrers are attributed to him for the dashboard (he's a program runner, excluded from
+# standings, so this does not affect the competition). We KEEP a `rep_blank` flag on each
+# record so the data-quality panel still surfaces blanks honestly — if a NEW blank ever
+# appears post-launch it will show up there even though it's attributed to Krish here.
+REP_REMAP = {"(blank)": "Krish Khurana", "": "Krish Khurana"}
 PRIZES = [1000, 500, 250]
 DROPS_PER_BOTTLE = 100
 PROV = {"british columbia":"BC","bc":"BC","alberta":"AB","ab":"AB","saskatchewan":"SK",
@@ -40,7 +47,19 @@ PROV = {"british columbia":"BC","bc":"BC","alberta":"AB","ab":"AB","saskatchewan
         "québec":"QC","qc":"QC","new brunswick":"NB","nb":"NB","nova scotia":"NS","ns":"NS",
         "newfoundland":"NL","newfoundland and labrador":"NL","nl":"NL",
         "prince edward island":"PE","pe":"PE","pei":"PE","yukon":"YT","yt":"YT",
-        "northwest territories":"NT","nt":"NT","nunavut":"NU","nu":"NU"}
+        "northwest territories":"NT","nt":"NT","nunavut":"NU","nu":"NU",
+        # common variants seen in the live data (Québec "PQ", "Ont", one-word "Novascotia")
+        "pq":"QC","p.q.":"QC","que":"QC","ont":"ON","ontario.":"ON","novascotia":"NS"}
+# Canadian postal-code first letter -> province (most reliable fallback; an address can
+# misspell the province but the postal code still pins it). X is NT/NU (default NT, rare).
+POSTAL_PROV = {"A":"NL","B":"NS","C":"PE","E":"NB","G":"QC","H":"QC","J":"QC","K":"ON",
+               "L":"ON","M":"ON","N":"ON","P":"ON","R":"MB","S":"SK","T":"AB","V":"BC",
+               "X":"NT","Y":"YT"}
+# Last-resort city fallback for addresses with no parseable state token AND no postal code.
+CITY_PROV = {"montreal":"QC","montréal":"QC","laval":"QC","gatineau":"QC","longueuil":"QC",
+             "sherbrooke":"QC","trois-rivières":"QC","lévis":"QC",
+             "toronto":"ON","ottawa":"ON","mississauga":"ON","hamilton":"ON",
+             "calgary":"AB","edmonton":"AB","winnipeg":"MB","saskatoon":"SK","regina":"SK"}
 
 # Province -> region rollup (geographic L-to-R: West, Central, Atlantic). Anything
 # unmapped (incl. blank/"—") falls into "Unknown" and is only shown if non-empty.
@@ -90,14 +109,19 @@ def to_int(s):
     d = "".join(c for c in str(s) if c.isdigit()); return int(d) if d else 0
 
 def province(state, address):
-    s = (state or "").strip().lower()
+    s = (state or "").strip().lower().rstrip(".")
     if s in PROV: return PROV[s]
     blob = (address or "").lower()
     for name, code in PROV.items():
         if len(name) > 3 and name in blob: return code
+    # postal-code prefix (reliable even when the province is misspelled / "Select..." / blank)
+    m = re.search(r"\b([ABCEGHJKLMNPRSTVXY])\d[A-Z]\s*\d[A-Z]\d\b", (address or "").upper())
+    if m: return POSTAL_PROV[m.group(1)]
     for tok in re.findall(r"\b([a-z]{2})\b", blob):
         if tok.upper() in {"BC","AB","SK","MB","ON","QC","NB","NS","NL","PE","YT","NT","NU"}:
             return tok.upper()
+    for city, code in CITY_PROV.items():
+        if city in blob: return code
     return "—"
 
 def doctor_key(doctor, license):
@@ -125,7 +149,9 @@ def fetch_records():
             "email": text(a(s, QID["email"])), "phone": phone(a(s, QID["phone"])),
             "address": addr, "province": province(state, addr),
             "samples": to_int(text(a(s, QID["samples"]))), "license": lic,
-            "rep": text(a(s, QID["rep"])) or "(blank)", "year": d[:4], "q": (m-1)//3+1,
+            "rep": (lambda rp: REP_REMAP.get(rp, rp))(text(a(s, QID["rep"])) or "(blank)"),
+            "rep_blank": text(a(s, QID["rep"])).strip() == "",
+            "year": d[:4], "q": (m-1)//3+1,
             "month": d[:7], "dkey": doctor_key(doctor, lic)})
     recs.sort(key=lambda r: r["date"], reverse=True)
     return recs
@@ -273,9 +299,10 @@ def build_consumption(records, today, current_reps):
                            "per_doc": round(b/len(dset), 1)})
     efficiency.sort(key=lambda x: -x["docs"])
 
-    # data-quality flags (aggregate counts only)
-    dq = {"no_rep": sum(1 for r in records if r["rep"] in ("(blank)", "")),
-          "no_rep_bottles": sum(r["samples"] for r in records if r["rep"] in ("(blank)", "")),
+    # data-quality flags (aggregate counts only). no_rep uses the raw rep_blank flag so the
+    # panel stays honest even though blanks are attributed to Krish in `rep` (see REP_REMAP).
+    dq = {"no_rep": sum(1 for r in records if r["rep_blank"]),
+          "no_rep_bottles": sum(r["samples"] for r in records if r["rep_blank"]),
           "no_province": sum(1 for r in records if not r["province"] or r["province"] == "—"),
           "no_license": sum(1 for r in records if not r["license"]),
           "total": len(records)}
@@ -602,10 +629,11 @@ function lapsedPanel(id,l){const host=document.getElementById(id);if(!host||!l)r
    <div class="segbar"><div class="seg act" style="flex:${Math.max(l.active,0.001)}" title="Active (≤${l.days}d): ${l.active}"></div><div class="seg mid" style="flex:${Math.max(l.mid,0.001)}" title="${l.days}–${2*l.days}d: ${l.mid}"></div><div class="seg deep" style="flex:${Math.max(l.deep,0.001)}" title=">${2*l.days}d: ${l.deep}"></div></div>
    <div class="seglegend"><span><i class="act"></i>Active ${l.active}</span><span><i class="mid"></i>${l.days}–${2*l.days}d ${l.mid}</span><span><i class="deep"></i>${2*l.days}d+ ${l.deep}</span></div>`;}
 function dqPanel(id,d){const host=document.getElementById(id);if(!host||!d)return;
-  const items=[["No referrer named",d.no_rep,`${fmt(d.no_rep_bottles)} bottles unattributed`],
-    ["Missing province",d.no_province,"can’t be placed on a territory"],
-    ["Missing licence #",d.no_license,"dedupe falls back to name"]];
-  host.innerHTML='<div class="dqgrid">'+items.map(it=>`<div class="dqcard${it[1]?' warn':' ok'}"><div class="n">${fmt(it[1])}</div><div class="l">${esc(it[0])}</div><div class="s">${esc(it[2])}</div></div>`).join("")+`</div><p class="note">Of ${fmt(d.total)} submissions all-time.</p>`;}
+  // [label, count, sub, warn?] — no-referrer is informational (pre-launch, attributed to Krish), not a warning.
+  const items=[["No referrer named",d.no_rep,`${fmt(d.no_rep_bottles)} bottles · pre-launch, credited to Krish`,false],
+    ["Missing province",d.no_province,d.no_province?"can’t be placed on a territory":"all resolved via postal code",d.no_province>0],
+    ["Missing licence #",d.no_license,"dedupe falls back to name",d.no_license>0]];
+  host.innerHTML='<div class="dqgrid">'+items.map(it=>`<div class="dqcard${it[3]?' warn':' ok'}"><div class="n">${fmt(it[1])}</div><div class="l">${esc(it[0])}</div><div class="s">${esc(it[2])}</div></div>`).join("")+`</div><p class="note">Of ${fmt(d.total)} submissions all-time.</p>`;}
 
 (function(){
   const k=DATA.consumption.kpis,t=DATA.team,c=DATA.current,run=DATA.consumption.run;
