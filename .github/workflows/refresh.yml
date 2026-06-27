@@ -26,6 +26,7 @@ jobs:
         env:
           JOTFORM_API_KEY: ${{ secrets.JOTFORM_API_KEY }}
           MGMT_PASSPHRASE: ${{ secrets.MGMT_PASSPHRASE }}
+          SALES_DATA: ${{ secrets.SALES_DATA }}
         run: |
           mkdir -p m-2ca38f6f79
           python generate.py --encrypted --out m-2ca38f6f79
