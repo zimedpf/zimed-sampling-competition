@@ -856,7 +856,7 @@ function samplesVsSales(id,samples,sales){const host=document.getElementById(id)
   set("heroLeader",nobody?"Nobody yet":topRep.rep);
   set("heroLeaderSub",nobody?"no rep is leading":`${topRep.points} unique doctor${topRep.points===1?'':'s'}`);
   set("heroDrops",fmt(k.drops));
-  set("heroDropsSub",`${fmt(t.clinics)} doctors reached · ${fmt(t.bottles)} sample bottles`);
+  set("heroDropsSub",`${fmt(t.bottles)} sample bottles · ≈100 drops each`);
   // --- secondary readout strip (same on both views) ---
   const cards=[
     [fmt(t.bottles),"Sample bottles","into clinics all-time"],
@@ -904,11 +904,11 @@ pastQ(document.getElementById("past"),DATA.past);
     samplesVsSales("samplesVsSales",DATA.consumption.by_province,sl.by_province);
     const ratio=sampled?(t.units/sampled):0;
     const sk=[
-      [money(t.revenue),"Net revenue",`through ${esc(sl.through)}`],
-      [fmt(t.units),"Bottles sold",`${t.orders} invoices · ${t.returns} returns`],
-      ["$"+(t.units?Math.round(t.revenue/t.units):0),"Avg $ / bottle","blended"],
-      [tp?tp.k:"—","Top province",tp?money(tp.revenue):""],
-      [ratio?ratio.toFixed(1)+"×":"—","Sold vs sampled","bottles sold ÷ sampled"],
+      [money(t.revenue),"Net revenue",`program to date · thru ${esc(sl.through)}`],
+      [fmt(t.units),"Bottles sold",`net of returns · ${t.orders} invoices, ${t.returns} returns`],
+      ["$"+(t.units?Math.round(t.revenue/t.units):0),"Avg $ / bottle","across all paid sales"],
+      [tp?tp.k:"—","Top province by revenue",tp?money(tp.revenue)+" sold":""],
+      [ratio?ratio.toFixed(1)+"×":"—","Sold per sampled","paid bottles per free sample · directional"],
     ];
     const ske=document.getElementById("salesKpis");
     if(ske)ske.innerHTML=sk.map(x=>`<div class="kpi"><div class="n">${esc(x[0])}</div><div class="l">${esc(x[1])}</div><div class="s">${esc(x[2])}</div></div>`).join("");}
@@ -972,15 +972,15 @@ def page(data, records, mode, cipher=None):
     C_ORDERMIX = '<div class="card"><h2>Order-size mix</h2><p class="note">Sample bottles requested per form.</p><div id="orderMix"></div></div>'
     C_NEWREP   = '<div class="card"><h2>New vs repeat sample volume by quarter</h2><p class="note"><span class="pill">teal = new</span> &nbsp; <span class="pill" style="background:#fff3d6;color:#9a6b00">gold = repeat</span></p><div id="newrep"></div></div>'
     # Geography
-    C_BYPROVINCE = '<div class="card"><h2>Sample bottles by province</h2><p class="note">Where the free samples are landing (clinic location).</p><div id="byProvince"></div></div>'
-    C_BYREGION   = '<div class="card"><h2>Sample bottles by territory</h2><p class="note">Provinces rolled up West / Central / Atlantic.</p><div id="byRegion"></div></div>'
+    C_BYPROVINCE = '<div class="card"><h2>Sample bottles by province</h2><p class="note">Where the free samples are landing, all-time (clinic location).</p><div id="byProvince"></div></div>'
+    C_BYREGION   = '<div class="card"><h2>Sample bottles by territory</h2><p class="note">All-time sample volume, provinces rolled up West / Central / Atlantic.</p><div id="byRegion"></div></div>'
     # Contest outlook + attribution
     C_RUNRATE    = '<div class="card"><h2>Current-period run-rate</h2><p class="note">Projected sample bottle volume for the period if the current pace holds.</p><div id="runrate"></div></div>'
     C_PROJECTION = '<div class="card"><h2>On pace to win</h2><p class="note">Unique doctors so far <span class="pmut">→ projected at the current rate</span> for each competing rep.</p><div id="projection"></div></div>'
-    C_BYREP      = '<div class="card"><h2>Sample bottles by referrer</h2><p class="note">Total sample volume credited to each name (everyone, incl. non-competitors).</p><div id="byRep"></div></div>'
+    C_BYREP      = '<div class="card"><h2>Sample bottles by referrer</h2><p class="note">Total sample volume, all-time, credited to each name (everyone, incl. non-competitors).</p><div id="byRep"></div></div>'
     # Management-only: contest momentum + operations
     C_MOMENTUM   = '<div class="card"><h2>Rep momentum</h2><p class="note">Unique doctors signed each quarter, per competing rep. Latest quarter in gold; arrow shows change vs the prior quarter.</p><div id="momentum"></div></div>'
-    C_LAPSED     = "<div class=\"card\"><h2>Lapsed reach</h2><p class=\"note\">Doctors who haven't requested recently — the re-engagement pool.</p><div id=\"lapsed\"></div></div>"
+    C_LAPSED     = "<div class=\"card\"><h2>Lapsed reach</h2><p class=\"note\">Doctors who've gone quiet since their last sample request, the re-engagement pool. The bands below group them by how long it's been.</p><div id=\"lapsed\"></div></div>"
     C_EFFICIENCY = '<div class="card"><h2>Rep efficiency</h2><p class="note">Doctors reached and average order size per competing rep.</p><div id="efficiency"></div></div>'
     C_DQ         = '<div class="card"><h2>Data-quality flags</h2><p class="note">Submissions missing fields that weaken attribution or geography.</p><div id="dataquality"></div></div>'
     # Paid sales (management-only, confidential)
@@ -989,7 +989,7 @@ def page(data, records, mode, cipher=None):
                   'Sales are paid units bought by wholesalers, from Clarion Finance invoices through '
                   f'<strong>{sales_through}</strong>. Confidential — this lives only inside this encrypted page, never on the public board.</p></div>')
     C_SALES_MONTH    = '<div class="card"><h2>Sales by month</h2><p class="note"><span class="pill">teal bars = units sold</span> &nbsp;<span class="pill" style="background:#FCF3DC;color:#9a6b00">gold line = revenue $</span></p><div id="salesMonth"></div></div>'
-    C_SALES_PROVINCE = '<div class="card"><h2>Sales by province</h2><p class="note">Net revenue and paid units sold per province (wholesaler ship-to location).</p><div id="salesProvince"></div></div>'
+    C_SALES_PROVINCE = '<div class="card"><h2>Sales by province</h2><p class="note">All-time net revenue and paid units sold per province (wholesaler ship-to location).</p><div id="salesProvince"></div></div>'
     C_SALES_CUSTOMERS= ('<div class="card"><h2>Top distribution customers'
         '<span class="tip" tabindex="0">i<span class="tipc">'
         '<b>How Zimed reaches patients.</b> Most of our product does not go straight to pharmacies. '
@@ -1021,7 +1021,12 @@ def page(data, records, mode, cipher=None):
         # samples→sales bridge → the contest → internal ops → raw data).
         body = ""
         if has_sales:
-            body += _sec('Product at a glance <span class="mgmttag">confidential</span>') + SALES_KPI_STRIP
+            sales_tip = (f'<span class="tip" tabindex="0">i<span class="tipc">'
+                '<b>Sales at a glance.</b> These are <b>paid</b> Zimed units bought by wholesalers, not free samples. '
+                f'<b>Net revenue</b> is wholesaler invoice revenue minus returns, added up since the program began (cumulative, through {sales_through}). '
+                'It is not a calendar-year or month figure. <b>Sold per sampled</b> compares total paid bottles to total free sample bottles placed, '
+                'a rough read on how sampling is converting to sales.</span></span>')
+            body += _sec(f'Sales at a glance <span class="mgmttag">confidential</span>{sales_tip}') + SALES_KPI_STRIP
         body += (
             _sec("Sampling volume &amp; trend") + KPI_STRIP
             + _cols(C_BYMONTH, C_CUMULATIVE) + _cols(C_REQMONTH, C_AVGMONTH) + C_BYQUARTER
@@ -1068,7 +1073,7 @@ def page(data, records, mode, cipher=None):
   <div class="marquee">
     <div class="mq live"><div class="lab">Contest period</div><div class="big" id="heroPeriod">—</div><div class="sub" id="heroPeriodSub"></div></div>
     <div class="mq"><div class="lab">Current leader</div><div class="big gold" id="heroLeader">—</div><div class="sub" id="heroLeaderSub"></div></div>
-    <div class="mq"><div class="lab">Drops into clinics</div><div class="big" id="heroDrops">—</div><div class="sub" id="heroDropsSub"></div></div>
+    <div class="mq"><div class="lab">Eye-drops placed (est.)</div><div class="big" id="heroDrops">—</div><div class="sub" id="heroDropsSub"></div></div>
   </div>
 </header>
 <div class="wrap">
