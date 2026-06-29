@@ -1090,7 +1090,7 @@ GATE_JS = r"""
   ov.innerHTML='<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:30px 30px 26px;max-width:370px;width:90%;text-align:center;box-shadow:0 22px 60px rgba(0,0,0,.45)">'
    +'<svg width="40" height="40" viewBox="0 0 24 24" style="filter:drop-shadow(0 3px 8px rgba(0,0,0,.4))"><path d="M12 2C12 2 4 11 4 16a8 8 0 0016 0c0-5-8-14-8-14z" fill="#fff"/><circle cx="12" cy="15.5" r="3.4" fill="#03BAB3"/></svg>'
    +'<div style="font-family:\'IBM Plex Mono\',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#88ADA7;margin-top:12px">Confidential · Management view</div>'
-   +'<h2 style="margin:6px 0 4px;font-family:\'Archivo\',sans-serif;font-weight:800;font-size:21px;color:#fff">Zimed Sampling Contest</h2>'
+   +'<h2 style="margin:6px 0 4px;font-family:\'Archivo\',sans-serif;font-weight:800;font-size:21px;color:#fff">Zimed PF — Management Dashboard</h2>'
    +'<p style="font-size:13px;color:#88ADA7;margin:0 0 16px">Enter the passphrase shared with you.</p>'
    +'<input id="pw" type="password" placeholder="Passphrase" autocomplete="off" style="width:100%;padding:11px 13px;border:1px solid rgba(255,255,255,.18);border-radius:9px;font-size:14px;box-sizing:border-box;background:rgba(0,0,0,.25);color:#fff"/>'
    +'<div id="gerr" style="color:#F0A07F;font-size:12px;height:16px;margin-top:7px"></div>'
