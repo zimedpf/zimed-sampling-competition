@@ -928,9 +928,20 @@ if(typeof RECORDS!=="undefined"){
 document.getElementById("stamp").textContent=DATA.stamp;
 """
 
+# ---- Optional extension (management builds only). If the EXT_DATA payload is present, its
+# {html, css, js, data} ride inside DATA.ext, which in the hosted management page exists only inside
+# the AES-GCM ciphertext. After unlock this hook mounts html into <div id="ext"> and runs js inside
+# renderAll() so it can use the shared helpers. Never emitted into the public page.
+EXT_HOOK = r"""
+if(DATA.ext){const xh=document.getElementById("ext");if(xh&&DATA.ext.html)xh.innerHTML=DATA.ext.html;
+  if(DATA.ext.css){const xs=document.createElement("style");xs.textContent=DATA.ext.css;document.head.appendChild(xs);}
+  if(DATA.ext.js)eval(DATA.ext.js);}
+"""
+
 def page(data, records, mode, cipher=None):
     is_public = (mode == "public")
     has_sales = (not is_public) and bool(data and data.get("sales"))
+    has_ext = (not is_public) and bool(data and data.get("ext"))
     banner = ('<div class="banner pub">Public standings. Aggregate competition results only — no patient or physician details. Score = unique doctors signed per rep.</div>'
               if is_public else
               '<div class="banner priv"><strong>Confidential — management view.</strong> Sample-consumption analytics plus physician contact detail. Keep private.</div>')
@@ -1039,6 +1050,8 @@ def page(data, records, mode, cipher=None):
                 + _cols(C_SALES_MONTH, C_SALES_PROVINCE) + C_SALES_CUSTOMERS
                 + _sec("Samples &rarr; sales") + C_SAMPLES_VS_SALES
             )
+        if has_ext:
+            body += '<div id="ext"></div>'
         body += (
             _sec("The contest") + C_CURRENT + C_PAST + _cols(C_RUNRATE, C_PROJECTION) + C_MOMENTUM + C_BYREP
             + _sec('Operations <span class="mgmttag">internal</span>') + _cols(C_LAPSED, C_EFFICIENCY) + C_DQ
@@ -1051,7 +1064,8 @@ def page(data, records, mode, cipher=None):
         if mode == "private":
             boot += f"const RECORDS={dumps(records)};\n"
         boot += "renderAll();\n"
-    script = f"const NONREP=new Set({dumps(NONREP_NAMES)});\n" + "function renderAll(){\n" + JS + "\n}\n" + boot
+    script = (f"const NONREP=new Set({dumps(NONREP_NAMES)});\n" + "function renderAll(){\n" + JS
+              + (EXT_HOOK if has_ext else "") + "\n}\n" + boot)
     robots = '<meta name="robots" content="noindex">' if mode != "private" else ''
     foot = ('Source: live JotForm “Zimed PF Sample Request Form”. Competition score = unique doctors who signed and named each rep '
             '(a doctor signing again does not add a point); Krish and Aymeric are excluded from standings. '
@@ -1149,6 +1163,26 @@ def load_sales():
         print(f"WARN: SALES_DATA present but unparseable ({e}); sales charts skipped.", file=sys.stderr)
         return None
 
+def load_ext():
+    """Optional management-only extension, from the EXT_DATA env (an Actions secret passed to the
+    encrypted step only). JSON {html, css, js, data, guard}. Returns None if absent/unparseable."""
+    raw = (os.environ.get("EXT_DATA") or "").strip()
+    if not raw: return None
+    try:
+        x = json.loads(raw)
+        return x if isinstance(x, dict) and (x.get("html") or x.get("js")) else None
+    except Exception as e:
+        print(f"WARN: EXT_DATA present but unparseable ({e}); extension skipped.", file=sys.stderr)
+        return None
+
+def ext_guard(html, ext):
+    """Defence-in-depth: none of the extension's own guard strings, nor its markup, may appear in a
+    public page or in the readable shell of the encrypted page."""
+    if not ext: return []
+    needles = [s for s in (ext.get("guard") or []) if isinstance(s, str) and s]
+    if ext.get("html"): needles.append(ext["html"])
+    return [n for n in needles if n in html]
+
 def sales_guard(html, sales):
     """Defence-in-depth: confirm no sales figures landed in a PUBLIC build."""
     if not sales: return []
@@ -1162,8 +1196,10 @@ def main():
     records = fetch_records()
     data = build(records)
     sales = load_sales()
-    # management payload carries sales; the public payload NEVER does.
+    ext = load_ext()
+    # management payload carries sales (+ the optional extension); the public payload NEVER does.
     mdata = {**data, "sales": sales} if sales else data
+    if ext: mdata = {**mdata, "ext": {k: ext[k] for k in ("html", "css", "js", "data") if k in ext}}
 
     if "--encrypted" in args:
         pw = (os.environ.get("MGMT_PASSPHRASE") or "").strip()
@@ -1172,9 +1208,11 @@ def main():
         html = page(mdata, records, "encrypted", cipher)
         leak = pii_guard(html, records)
         if leak: sys.exit(f"ABORT: {len(leak)} PII values leaked into the encrypted file (should be impossible).")
+        xleak = ext_guard(html.replace(cipher["ct"], ""), ext)
+        if xleak: sys.exit(f"ABORT: extension content outside the encrypted payload ({len(xleak)} markers).")
         os.makedirs(out_dir, exist_ok=True)
         open(os.path.join(out_dir, "index.html"), "w").write(html)
-        print(f"records={len(records)} sales={'yes' if sales else 'no'} -> {out_dir}/index.html (ENCRYPTED management view)")
+        print(f"records={len(records)} sales={'yes' if sales else 'no'} ext={'yes' if ext else 'no'} -> {out_dir}/index.html (ENCRYPTED management view)")
         return
 
     pub = page(data, None, "public")   # plain `data` — sales can never reach the public build
@@ -1182,6 +1220,8 @@ def main():
     if leak: sys.exit(f"ABORT: {len(leak)} PII values would leak into public file.")
     sleak = sales_guard(pub, sales)
     if sleak: sys.exit(f"ABORT: confidential sales data leaked into public file: {sleak}")
+    xleak = ext_guard(pub, ext) + (['id="ext"'] if 'id="ext"' in pub else [])
+    if xleak: sys.exit(f"ABORT: extension content leaked into public file ({len(xleak)} markers).")
     if "--public-only" in args:
         os.makedirs(out_dir, exist_ok=True)
         open(os.path.join(out_dir, "index.html"), "w").write(pub)
